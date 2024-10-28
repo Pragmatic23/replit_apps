@@ -9,7 +9,7 @@
 
     <!-- Statistics Cards -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">
@@ -20,7 +20,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">
@@ -31,7 +31,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">
@@ -39,6 +39,17 @@
                         Average Rating
                     </h5>
                     <p class="display-4">{{ "%.1f"|format(stats.average_rating) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-user-clock me-2"></i>
+                        Active Sessions
+                    </h5>
+                    <p class="display-4">{{ stats.active_sessions }}</p>
                 </div>
             </div>
         </div>
@@ -60,6 +71,7 @@
                             <th>Company</th>
                             <th>Registration Date</th>
                             <th>Admin</th>
+                            <th>Session Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -72,6 +84,14 @@
                             <td>
                                 {% if user.is_admin %}
                                 <span class="badge bg-primary">Admin</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set active_session = user.sessions|selectattr("session_end", "none")|first %}
+                                {% if active_session %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -97,6 +117,7 @@
                             <th>Requirements</th>
                             <th>Date</th>
                             <th>Rating</th>
+                            <th>Session ID</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -110,6 +131,13 @@
                                 <span class="badge bg-primary">{{ rec.rating }}/5</span>
                                 {% else %}
                                 <span class="badge bg-secondary">No rating</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.session_id %}
+                                <span class="badge bg-info">{{ rec.session_id }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">No session</span>
                                 {% endif %}
                             </td>
                         </tr>

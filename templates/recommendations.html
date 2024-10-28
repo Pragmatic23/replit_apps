@@ -32,27 +32,16 @@
                                 {% set modules = recommendations.split('\n\n') %}
                                 {% for module in modules %}
                                     {% if module.strip() %}
-                                        <div class="col-12 mb-4">
-                                            <div class="card">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
-                                                        <div class="module-icon me-3">
-                                                            <i class="fas fa-cube"></i>
-                                                        </div>
-                                                        <h3 class="card-title mb-0">
-                                                            {% set module_lines = module.split('\n') %}
-                                                            {% for line in module_lines %}
-                                                                {% if '# ' in line or '### ' in line %}
-                                                                    {{ line.split('# ')[-1].split('### ')[-1] }}
-                                                                    {% break %}
-                                                                {% endif %}
-                                                            {% endfor %}
-                                                        </h3>
-                                                    </div>
-                                                    <div class="module-content">
-                                                        {{ module | replace('\n', '<br>') | safe }}
-                                                    </div>
+                                        <div class="col-md-6">
+                                            <div class="module-card p-3">
+                                                <div class="text-center mb-3">
+                                                    <i class="fas fa-cube module-icon"></i>
                                                 </div>
+                                                {% set lines = module.strip().split('\n') %}
+                                                <h4 class="module-title text-center mb-3">{{ lines[0].strip() }}</h4>
+                                                {% if lines|length > 1 %}
+                                                    <p class="module-description text-center">{{ lines[1].strip() }}</p>
+                                                {% endif %}
                                             </div>
                                         </div>
                                     {% endif %}

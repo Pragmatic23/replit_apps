@@ -1,8 +1,9 @@
 from functools import wraps
+from datetime import datetime
 from flask import render_template, request, redirect, url_for, flash, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db
-from models import User, Recommendation
+from models import User, Recommendation, UserSession
 from utils import get_module_recommendations
 
 def admin_required(f):
@@ -13,8 +14,28 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def get_or_create_user_session():
+    if not current_user.is_authenticated:
+        return None
+    
+    active_session = UserSession.query.filter_by(
+        user_id=current_user.id,
+        session_end=None
+    ).first()
+    
+    if not active_session:
+        active_session = UserSession(user_id=current_user.id)
+        db.session.add(active_session)
+        db.session.commit()
+    
+    active_session.last_activity = datetime.utcnow()
+    db.session.commit()
+    return active_session
+
 @app.route('/')
 def index():
+    if current_user.is_authenticated:
+        get_or_create_user_session()
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -29,6 +50,8 @@ def login():
         
         if user and user.check_password(password):
             login_user(user)
+            # Create new session on login
+            get_or_create_user_session()
             return redirect(url_for('dashboard'))
         flash('Invalid email or password')
     
@@ -63,6 +86,8 @@ def signup():
         db.session.commit()
         
         login_user(user)
+        # Create new session for new user
+        get_or_create_user_session()
         return redirect(url_for('dashboard'))
     
     return render_template('signup.html')
@@ -70,18 +95,31 @@ def signup():
 @app.route('/logout')
 @login_required
 def logout():
+    # End current session
+    active_session = UserSession.query.filter_by(
+        user_id=current_user.id,
+        session_end=None
+    ).first()
+    if active_session:
+        active_session.session_end = datetime.utcnow()
+        db.session.commit()
+    
     logout_user()
     return redirect(url_for('index'))
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Update session activity
+    get_or_create_user_session()
     user_recommendations = Recommendation.query.filter_by(user_id=current_user.id).order_by(Recommendation.created_at.desc()).all()
     return render_template('user/dashboard.html', recommendations=user_recommendations)
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
+    # Update session activity
+    get_or_create_user_session()
     if request.method == 'POST':
         current_user.username = request.form.get('username')
         current_user.bio = request.form.get('bio')
@@ -96,10 +134,12 @@ def profile():
 def admin_dashboard():
     users = User.query.order_by(User.created_at.desc()).all()
     recommendations = Recommendation.query.order_by(Recommendation.created_at.desc()).all()
+    active_sessions = UserSession.query.filter_by(session_end=None).count()
     stats = {
         'total_users': User.query.count(),
         'total_recommendations': Recommendation.query.count(),
-        'average_rating': db.session.query(db.func.avg(Recommendation.rating)).scalar() or 0
+        'average_rating': db.session.query(db.func.avg(Recommendation.rating)).scalar() or 0,
+        'active_sessions': active_sessions
     }
     return render_template('admin/dashboard.html', users=users, recommendations=recommendations, stats=stats)
 
@@ -114,10 +154,12 @@ def get_recommendations():
     
     # Save recommendation if user is logged in
     if current_user.is_authenticated:
+        active_session = get_or_create_user_session()
         recommendation = Recommendation(
             requirements=requirements,
             recommendations=recommendations,
-            user_id=current_user.id
+            user_id=current_user.id,
+            session_id=active_session.id if active_session else None
         )
         db.session.add(recommendation)
         db.session.commit()

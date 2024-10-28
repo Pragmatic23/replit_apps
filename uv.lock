@@ -484,6 +484,7 @@ dependencies = [
     { name = "oauthlib" },
     { name = "openai" },
     { name = "psycopg2-binary" },
+    { name = "werkzeug" },
 ]
 
 [package.metadata]
@@ -495,6 +496,7 @@ requires-dist = [
     { name = "oauthlib", specifier = ">=3.2.2" },
     { name = "openai", specifier = ">=1.52.2" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
+    { name = "werkzeug", specifier = ">=3.0.6" },
 ]
 
 [[package]]

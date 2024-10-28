@@ -18,10 +18,12 @@ def get_module_recommendations(
     features: Optional[List[str]] = None
 ) -> str:
     # Create a detailed context from the filters
+    formatted_features = format_features(features if features else [])
+    
     context = f"""Industry: {industry}
 Company Size: {company_size}
 Budget Level: {budget}
-Required Features: {format_features(features) if features else 'No specific features selected'}
+Required Features: {formatted_features}
 Additional Requirements: {requirements}"""
 
     prompt = f"""Based on the following business context, recommend 4 most suitable Odoo modules.

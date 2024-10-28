@@ -29,8 +29,8 @@ body {
 /* Module card styles */
 .module-card {
     aspect-ratio: 1;
-    height: 200px;
-    width: 200px;
+    height: 210px;
+    width: 210px;
     display: flex;
     flex-direction: column;
     justify-content: center;

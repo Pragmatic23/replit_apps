@@ -15,10 +15,42 @@
                     {% if current_user.company %}
                     <p><i class="fas fa-building me-2"></i>{{ current_user.company }}</p>
                     {% endif %}
+                    <p><i class="fas fa-clock me-2"></i>Last Login: {{ current_user.last_login.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                     <a href="{{ url_for('profile') }}" class="btn btn-primary">
                         <i class="fas fa-edit me-2"></i>
                         Edit Profile
                     </a>
+                </div>
+            </div>
+
+            <!-- Recent Sessions Card -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h4 class="card-title">
+                        <i class="fas fa-history me-2"></i>
+                        Recent Sessions
+                    </h4>
+                    <div class="list-group">
+                        {% for session in session_history %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-2"></i>
+                                    {{ session.login_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                </small>
+                                {% if session.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Ended</span>
+                                {% endif %}
+                            </div>
+                            <small class="d-block text-muted">
+                                <i class="fas fa-globe me-2"></i>
+                                {{ session.ip_address }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -31,8 +63,8 @@
                         <i class="fas fa-history me-2"></i>
                         Your Recommendations History
                     </h2>
-                    {% if recommendations %}
-                        {% for rec in recommendations %}
+                    {% if recommendations.items %}
+                        {% for rec in recommendations.items %}
                         <div class="card mb-3">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -62,6 +94,25 @@
                             </div>
                         </div>
                         {% endfor %}
+
+                        <!-- Pagination -->
+                        {% if recommendations.pages > 1 %}
+                        <nav aria-label="Recommendations pagination">
+                            <ul class="pagination justify-content-center">
+                                {% for page_num in recommendations.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
+                                    {% if page_num %}
+                                        <li class="page-item {% if page_num == recommendations.page %}active{% endif %}">
+                                            <a class="page-link" href="{{ url_for('dashboard', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">...</span>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </nav>
+                        {% endif %}
                     {% else %}
                         <div class="text-center py-4">
                             <i class="fas fa-search fa-3x mb-3 text-muted"></i>

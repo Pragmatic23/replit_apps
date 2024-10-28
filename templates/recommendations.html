@@ -13,42 +13,28 @@
         </div>
     </div>
 
-    {% if recommendations and recommendations.get('modules') %}
-    <div class="row">
-        {% for module in recommendations.get('modules', []) %}
-        <div class="col-md-6 mb-4">
-            <div class="module-card p-4">
-                <div class="module-icon">
-                    <i class="fas fa-cube"></i>
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Recommended Modules</h2>
+                    {% if recommendations and recommendations.startswith('Error') %}
+                        <div class="alert alert-danger">
+                            {{ recommendations }}
+                        </div>
+                    {% else %}
+                        <div class="recommendations-text">
+                            {{ recommendations | safe | replace('\n', '<br>') }}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="mt-4 text-center">
+                        <a href="/" class="btn btn-primary">
+                            Try Another Search
+                        </a>
+                    </div>
                 </div>
-                <h3 class="module-name">{{ module.name }}</h3>
-                <div class="module-category">
-                    <i class="fas fa-tag me-2"></i>{{ module.get('category', 'General') }}
-                </div>
-                <p class="module-description">{{ module.get('description', '') }}</p>
-                {% if module.get('features') %}
-                <h4 class="h5 mb-3">Key Features:</h4>
-                <ul class="module-features">
-                    {% for feature in module.features %}
-                    <li>{{ feature }}</li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
             </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% elif recommendations.get('error') %}
-    <div class="alert alert-danger">
-        {{ recommendations.error }}
-    </div>
-    {% endif %}
-
-    <div class="row justify-content-center mt-4">
-        <div class="col-md-6 text-center">
-            <a href="/" class="btn btn-primary">
-                <i class="fas fa-search me-2"></i>Try Another Search
-            </a>
         </div>
     </div>
 </div>

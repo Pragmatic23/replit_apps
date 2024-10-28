@@ -5,13 +5,15 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db
 from models import User, Recommendation, UserSession
 from utils import get_module_recommendations
-from sqlalchemy import func
+from sqlalchemy import func, distinct
 
 def admin_required(f):
     @wraps(f)
+    @login_required
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            abort(403)
+        if not current_user.is_admin:
+            flash('You need administrator privileges to access this page.', 'error')
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -52,6 +54,8 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             get_or_create_user_session()
+            if user.is_admin:
+                return redirect(url_for('admin_dashboard'))
             return redirect(url_for('dashboard'))
         flash('Invalid email or password')
     
@@ -129,8 +133,9 @@ def profile():
 @admin_required
 def admin_dashboard():
     # Basic statistics
-    users = User.query.order_by(User.created_at.desc()).all()
-    recommendations = Recommendation.query.order_by(Recommendation.created_at.desc()).limit(10).all()
+    total_users = User.query.count()
+    total_recommendations = Recommendation.query.count()
+    average_rating = db.session.query(func.avg(Recommendation.rating)).scalar() or 0
     active_sessions = UserSession.query.filter_by(session_end=None).count()
     
     # User activity trends (last 7 days)
@@ -141,6 +146,10 @@ def admin_dashboard():
     ).filter(UserSession.session_start >= week_ago)\
     .group_by(func.date(UserSession.session_start))\
     .order_by(func.date(UserSession.session_start)).all()
+    
+    # Recent users and recommendations
+    users = User.query.order_by(User.created_at.desc()).all()
+    recommendations = Recommendation.query.order_by(Recommendation.created_at.desc()).limit(10).all()
     
     # Calculate average session duration
     completed_sessions = UserSession.query.filter(
@@ -155,12 +164,7 @@ def admin_dashboard():
     
     avg_duration = str(total_duration / session_count if session_count > 0 else timedelta())
     
-    # Most used features (based on recommendations)
-    feature_usage = db.session.query(
-        func.count(Recommendation.id).label('count')
-    ).filter(Recommendation.created_at >= week_ago).scalar()
-    
-    # Calculate average rating per day
+    # Daily ratings
     daily_ratings = db.session.query(
         func.date(Recommendation.created_at).label('date'),
         func.avg(Recommendation.rating).label('avg_rating')
@@ -171,13 +175,15 @@ def admin_dashboard():
     .order_by(func.date(Recommendation.created_at)).all()
     
     stats = {
-        'total_users': User.query.count(),
-        'total_recommendations': Recommendation.query.count(),
-        'average_rating': db.session.query(func.avg(Recommendation.rating)).scalar() or 0,
+        'total_users': total_users,
+        'total_recommendations': total_recommendations,
+        'average_rating': float(average_rating),
         'active_sessions': active_sessions,
         'daily_users': daily_users,
         'avg_session_duration': avg_duration,
-        'weekly_feature_usage': feature_usage,
+        'weekly_feature_usage': Recommendation.query.filter(
+            Recommendation.created_at >= week_ago
+        ).count(),
         'daily_ratings': daily_ratings
     }
     

@@ -29,8 +29,8 @@ body {
 /* Module card styles */
 .module-card {
     aspect-ratio: 1;
-    height: 250px;
-    width: 250px;
+    height: 300px;
+    width: 300px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -52,7 +52,7 @@ body {
 }
 
 .module-title {
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     line-height: 1.2;
     margin-bottom: 0.5rem;
     overflow: hidden;
@@ -63,7 +63,7 @@ body {
 }
 
 .module-description {
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     line-height: 1.4;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -73,7 +73,7 @@ body {
 }
 
 .module-icon {
-    font-size: 2rem;
+    font-size: 2.5rem;
     color: var(--purple-accent);
     opacity: 0.9;
     transition: opacity 0.3s ease;

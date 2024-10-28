@@ -1,7 +1,6 @@
 import os
-from functools import lru_cache
-from openai import OpenAI
 from typing import List, Optional
+from openai import OpenAI
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -11,7 +10,6 @@ def format_features(features: Optional[List[str]]) -> str:
         return "No specific features selected"
     return ", ".join(features)
 
-@lru_cache(maxsize=100)
 def get_module_recommendations(
     requirements: str,
     industry: str = "",

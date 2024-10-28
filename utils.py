@@ -6,10 +6,9 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 def get_module_recommendations(requirements: str) -> str:
     prompt = f"""Based on these business requirements, suggest appropriate Odoo modules. 
-    For each module suggestion, include:
+    For each module suggestion, provide:
     - Module name
-    - Brief description
-    - Key features
+    - A brief description of its purpose and main functionality
     
     Requirements: {requirements}"""
     

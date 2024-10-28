@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container my-4">
+    <h1 class="mb-4">
+        <i class="fas fa-user-shield me-2"></i>
+        Admin Dashboard
+    </h1>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-users me-2"></i>
+                        Total Users
+                    </h5>
+                    <p class="display-4">{{ stats.total_users }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-list me-2"></i>
+                        Total Recommendations
+                    </h5>
+                    <p class="display-4">{{ stats.total_recommendations }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-star me-2"></i>
+                        Average Rating
+                    </h5>
+                    <p class="display-4">{{ "%.1f"|format(stats.average_rating) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="card-title mb-4">
+                <i class="fas fa-users me-2"></i>
+                Registered Users
+            </h2>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Company</th>
+                            <th>Registration Date</th>
+                            <th>Admin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.company or 'N/A' }}</td>
+                            <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>
+                                {% if user.is_admin %}
+                                <span class="badge bg-primary">Admin</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recommendations Table -->
+    <div class="card">
+        <div class="card-body">
+            <h2 class="card-title mb-4">
+                <i class="fas fa-history me-2"></i>
+                Recent Recommendations
+            </h2>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Requirements</th>
+                            <th>Date</th>
+                            <th>Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in recommendations %}
+                        <tr>
+                            <td>{{ rec.user.username }}</td>
+                            <td>{{ rec.requirements[:100] }}...</td>
+                            <td>{{ rec.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>
+                                {% if rec.rating %}
+                                <span class="badge bg-primary">{{ rec.rating }}/5</span>
+                                {% else %}
+                                <span class="badge bg-secondary">No rating</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

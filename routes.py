@@ -1,8 +1,17 @@
-from flask import render_template, request, redirect, url_for, flash
+from functools import wraps
+from flask import render_template, request, redirect, url_for, flash, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db
 from models import User, Recommendation
 from utils import get_module_recommendations
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
 def index():
@@ -20,7 +29,7 @@ def login():
         
         if user and user.check_password(password):
             login_user(user)
-            return redirect(url_for('index'))
+            return redirect(url_for('dashboard'))
         flash('Invalid email or password')
     
     return render_template('login.html')
@@ -54,7 +63,7 @@ def signup():
         db.session.commit()
         
         login_user(user)
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     return render_template('signup.html')
 
@@ -63,6 +72,36 @@ def signup():
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    user_recommendations = Recommendation.query.filter_by(user_id=current_user.id).order_by(Recommendation.created_at.desc()).all()
+    return render_template('user/dashboard.html', recommendations=user_recommendations)
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        current_user.username = request.form.get('username')
+        current_user.bio = request.form.get('bio')
+        current_user.company = request.form.get('company')
+        db.session.commit()
+        flash('Profile updated successfully')
+        return redirect(url_for('profile'))
+    return render_template('user/profile.html')
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    users = User.query.order_by(User.created_at.desc()).all()
+    recommendations = Recommendation.query.order_by(Recommendation.created_at.desc()).all()
+    stats = {
+        'total_users': User.query.count(),
+        'total_recommendations': Recommendation.query.count(),
+        'average_rating': db.session.query(db.func.avg(Recommendation.rating)).scalar() or 0
+    }
+    return render_template('admin/dashboard.html', users=users, recommendations=recommendations, stats=stats)
 
 @app.route('/get_recommendations', methods=['POST'])
 def get_recommendations():

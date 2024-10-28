@@ -1,3 +1,110 @@
+/* Global styles */
+:root {
+    --gradient-overlay: linear-gradient(135deg, rgba(13, 17, 23, 0.9) 0%, rgba(47, 54, 95, 0.8) 100%);
+    --purple-accent: #8a2be2;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Hero section */
+.hero-section {
+    position: relative;
+    background: url('https://www.odoo.com/web/image/website.s_banner_default_image') center/cover;
+    padding: 6rem 0;
+    margin-bottom: 3rem;
+    color: var(--bs-light);
+    text-align: center;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--gradient-overlay);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    animation: fadeInUp 0.8s ease-out;
+}
+
+/* Navbar enhancements */
+.navbar {
+    background: var(--gradient-overlay) !important;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.3rem;
+}
+
+/* Form enhancements */
+.form-container {
+    animation: slideInUp 0.6s ease-out;
+}
+
+.form-control {
+    background-color: var(--bs-dark);
+    border-color: var(--bs-border-color);
+    color: var(--bs-light);
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    background-color: var(--bs-dark);
+    border-color: var(--purple-accent);
+    box-shadow: 0 0 0 0.25rem rgba(138, 43, 226, 0.25);
+}
+
+/* Module card styles */
+.module-card {
+    background: var(--bs-dark);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    height: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.module-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(138, 43, 226, 0.2);
+    border-color: var(--purple-accent);
+}
+
+.module-icon {
+    font-size: 2.5rem;
+    color: var(--purple-accent);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.module-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--bs-light);
+}
+
+.module-description {
+    color: var(--bs-secondary-text);
+    margin-bottom: auto;
+    overflow-y: auto;
+    max-height: 150px;
+}
+
 /* Loading Animation */
 .loading-spinner {
     display: none;
@@ -7,28 +114,37 @@
 
 .loading-spinner.active {
     display: block;
+    animation: fadeIn 0.3s ease-out;
 }
 
-/* Form enhancements */
-.form-control {
-    background-color: var(--bs-dark);
-    border-color: var(--bs-border-color);
-    color: var(--bs-light);
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.form-control:focus {
-    background-color: var(--bs-dark);
-    border-color: var(--bs-primary);
-    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-/* Recommendations styling */
-.recommendations-text {
-    white-space: pre-line;
-    line-height: 1.6;
-    color: var(--bs-light);
-}
-
-.recommendations-text br {
-    margin-bottom: 0.5rem;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }

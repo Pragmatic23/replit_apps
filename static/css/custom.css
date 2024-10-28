@@ -2,7 +2,7 @@
 :root {
     --gradient-overlay: linear-gradient(135deg, rgba(13, 17, 23, 0.9) 0%, rgba(47, 54, 95, 0.8) 100%);
     --purple-accent: #8a2be2;
-    --card-bg: #1a1d21;
+    --card-gradient: linear-gradient(160deg, #1a1d21 0%, #2d3748 100%);
 }
 
 body {
@@ -28,55 +28,82 @@ body {
 
 /* Module card styles */
 .module-card {
-    background: var(--card-bg);
-    border: 1px solid var(--bs-border-color);
-    border-radius: 12px;
-    padding: 2rem;
+    background: var(--card-gradient);
+    border: 1px solid rgba(138, 43, 226, 0.2);
+    border-radius: 16px;
+    padding: 2.5rem;
     aspect-ratio: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     text-align: center;
     transition: all 0.3s ease;
     animation: fadeInUp 0.6s ease-out;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .module-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(138, 43, 226, 0.2);
+    box-shadow: 0 8px 15px rgba(138, 43, 226, 0.15);
     border-color: var(--purple-accent);
 }
 
 .module-icon {
-    font-size: 3rem;
+    font-size: 3.5rem;
     color: var(--purple-accent);
     margin-bottom: 1.5rem;
+    opacity: 0.9;
+    transition: opacity 0.3s ease;
+}
+
+.module-card:hover .module-icon {
+    opacity: 1;
 }
 
 .module-title {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     font-weight: 600;
     margin-bottom: 1rem;
     color: var(--bs-light);
+    letter-spacing: 0.5px;
 }
 
 .module-description {
     color: var(--bs-secondary-text);
-    margin-bottom: 1.5rem;
-    flex-grow: 1;
-    overflow-y: auto;
-    max-height: 100px;
+    margin-bottom: 0;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
-.btn-outline-primary {
+/* Star Rating */
+.rating {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    gap: 0.5rem;
+}
+
+.rating input {
+    display: none;
+}
+
+.rating label {
+    cursor: pointer;
+    font-size: 2rem;
+    color: var(--bs-secondary);
+    transition: color 0.2s ease;
+}
+
+.rating input:checked ~ label {
     color: var(--purple-accent);
-    border-color: var(--purple-accent);
 }
 
-.btn-outline-primary:hover {
-    background-color: var(--purple-accent);
-    border-color: var(--purple-accent);
-    color: white;
+.rating label:hover,
+.rating label:hover ~ label {
+    color: var(--purple-accent);
 }
 
 /* Loading Animation */
@@ -89,6 +116,27 @@ body {
 .loading-spinner.active {
     display: block;
     animation: fadeIn 0.3s ease-out;
+}
+
+/* Feedback Form */
+.feedback-form {
+    background: var(--card-gradient);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-top: 3rem;
+    border: 1px solid rgba(138, 43, 226, 0.2);
+}
+
+.feedback-form textarea {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(138, 43, 226, 0.2);
+    color: var(--bs-light);
+}
+
+.feedback-form textarea:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--purple-accent);
+    box-shadow: 0 0 0 0.25rem rgba(138, 43, 226, 0.25);
 }
 
 /* Animations */

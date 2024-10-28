@@ -110,6 +110,7 @@ def get_recommendations():
         return "Please provide your requirements", 400
 
     recommendations = get_module_recommendations(requirements)
+    recommendation_id = None
     
     # Save recommendation if user is logged in
     if current_user.is_authenticated:
@@ -120,5 +121,32 @@ def get_recommendations():
         )
         db.session.add(recommendation)
         db.session.commit()
+        recommendation_id = recommendation.id
     
-    return render_template('recommendations.html', recommendations=recommendations)
+    return render_template('recommendations.html', 
+                         recommendations=recommendations,
+                         recommendation_id=recommendation_id)
+
+@app.route('/submit_feedback', methods=['POST'])
+@login_required
+def submit_feedback():
+    recommendation_id = request.form.get('recommendation_id')
+    rating = request.form.get('rating')
+    feedback = request.form.get('feedback')
+    
+    if not recommendation_id or not rating:
+        flash('Rating is required')
+        return redirect(request.referrer)
+        
+    recommendation = Recommendation.query.get_or_404(recommendation_id)
+    
+    # Ensure the recommendation belongs to the current user
+    if recommendation.user_id != current_user.id:
+        abort(403)
+        
+    recommendation.rating = int(rating)
+    recommendation.feedback = feedback
+    db.session.commit()
+    
+    flash('Thank you for your feedback!')
+    return redirect(url_for('dashboard'))

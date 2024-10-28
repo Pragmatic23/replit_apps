@@ -7,12 +7,13 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 @lru_cache(maxsize=100)
 def get_module_recommendations(requirements: str) -> str:
-    prompt = f"""Briefly suggest appropriate Odoo modules for these business requirements.
-    For each module (limit to 4 modules), provide only:
-    - Module name
-    - One-line description of its main purpose
-    
-    Keep responses concise and focused. Requirements: {requirements}"""
+    prompt = f'''For these business requirements, recommend 4 Odoo modules.
+Format each recommendation as:
+
+Module Name
+Brief one-line description that explains the core value.
+
+Requirements: {requirements}'''
     
     try:
         if not OPENAI_API_KEY:

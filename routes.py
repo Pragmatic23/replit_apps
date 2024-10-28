@@ -1,10 +1,8 @@
 from functools import wraps
-from datetime import datetime
-import uuid
-from flask import render_template, request, redirect, url_for, flash, abort, session
+from flask import render_template, request, redirect, url_for, flash, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db
-from models import User, Recommendation, UserSession
+from models import User, Recommendation
 from utils import get_module_recommendations
 
 def admin_required(f):
@@ -14,23 +12,6 @@ def admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated_function
-
-@app.before_request
-def before_request():
-    if current_user.is_authenticated:
-        current_user.update_last_active()
-        if 'session_id' not in session:
-            # Create new session
-            session_id = str(uuid.uuid4())
-            user_session = UserSession(
-                user_id=current_user.id,
-                session_id=session_id,
-                ip_address=request.remote_addr,
-                user_agent=request.user_agent.string
-            )
-            db.session.add(user_session)
-            db.session.commit()
-            session['session_id'] = session_id
 
 @app.route('/')
 def index():
@@ -47,8 +28,6 @@ def login():
         user = User.query.filter_by(email=email).first()
         
         if user and user.check_password(password):
-            user.last_login = datetime.utcnow()
-            db.session.commit()
             login_user(user)
             return redirect(url_for('dashboard'))
         flash('Invalid email or password')
@@ -91,36 +70,14 @@ def signup():
 @app.route('/logout')
 @login_required
 def logout():
-    if current_user.is_authenticated and 'session_id' in session:
-        user_session = UserSession.query.filter_by(session_id=session['session_id']).first()
-        if user_session:
-            user_session.logout_at = datetime.utcnow()
-            user_session.is_active = False
-            db.session.commit()
-    session.pop('session_id', None)
     logout_user()
     return redirect(url_for('index'))
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-    user_recommendations = Recommendation.query\
-        .filter_by(user_id=current_user.id)\
-        .order_by(Recommendation.created_at.desc())\
-        .paginate(page=page, per_page=per_page)
-    
-    # Get session history
-    session_history = UserSession.query\
-        .filter_by(user_id=current_user.id)\
-        .order_by(UserSession.login_at.desc())\
-        .limit(5)\
-        .all()
-    
-    return render_template('user/dashboard.html', 
-                         recommendations=user_recommendations,
-                         session_history=session_history)
+    user_recommendations = Recommendation.query.filter_by(user_id=current_user.id).order_by(Recommendation.created_at.desc()).all()
+    return render_template('user/dashboard.html', recommendations=user_recommendations)
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -160,8 +117,7 @@ def get_recommendations():
         recommendation = Recommendation(
             requirements=requirements,
             recommendations=recommendations,
-            user_id=current_user.id,
-            session_id=session.get('session_id')
+            user_id=current_user.id
         )
         db.session.add(recommendation)
         db.session.commit()

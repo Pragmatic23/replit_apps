@@ -6,30 +6,12 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h3 class="card-title">Recommended Modules</h3>
-                <p class="card-text">{{ recommendations.summary }}</p>
+                <div class="recommendations-text">
+                    {{ recommendations | safe | replace('\n', '<br>') }}
+                </div>
             </div>
         </div>
     </div>
-</div>
-
-<div class="row">
-    {% for module in recommendations.modules %}
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h4 class="card-title">{{ module.name }}</h4>
-                <p class="card-text">{{ module.description }}</p>
-                <h5>Key Features:</h5>
-                <ul>
-                    {% for feature in module.key_features %}
-                    <li>{{ feature }}</li>
-                    {% endfor %}
-                </ul>
-                <p><strong>Category:</strong> {{ module.category }}</p>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
 </div>
 
 <div class="row mt-4">

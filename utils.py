@@ -1,6 +1,7 @@
 import os
-from typing import List, Optional
+from functools import lru_cache
 from openai import OpenAI
+from typing import List, Optional
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -10,6 +11,7 @@ def format_features(features: Optional[List[str]]) -> str:
         return "No specific features selected"
     return ", ".join(features)
 
+@lru_cache(maxsize=100)
 def get_module_recommendations(
     requirements: str,
     industry: str = "",
@@ -18,12 +20,10 @@ def get_module_recommendations(
     features: Optional[List[str]] = None
 ) -> str:
     # Create a detailed context from the filters
-    formatted_features = format_features(features if features else [])
-    
     context = f"""Industry: {industry}
 Company Size: {company_size}
 Budget Level: {budget}
-Required Features: {formatted_features}
+Required Features: {format_features(features) if features else 'No specific features selected'}
 Additional Requirements: {requirements}"""
 
     prompt = f"""Based on the following business context, recommend 4 most suitable Odoo modules.

@@ -1,10 +1,11 @@
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import render_template, request, redirect, url_for, flash, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db
 from models import User, Recommendation, UserSession
 from utils import get_module_recommendations
+from sqlalchemy import func
 
 def admin_required(f):
     @wraps(f)
@@ -127,16 +128,63 @@ def profile():
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
+    # Basic statistics
     users = User.query.order_by(User.created_at.desc()).all()
-    recommendations = Recommendation.query.order_by(Recommendation.created_at.desc()).all()
+    recommendations = Recommendation.query.order_by(Recommendation.created_at.desc()).limit(10).all()
     active_sessions = UserSession.query.filter_by(session_end=None).count()
+    
+    # User activity trends (last 7 days)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    daily_users = db.session.query(
+        func.date(UserSession.session_start).label('date'),
+        func.count(distinct(UserSession.user_id)).label('count')
+    ).filter(UserSession.session_start >= week_ago)\
+    .group_by(func.date(UserSession.session_start))\
+    .order_by(func.date(UserSession.session_start)).all()
+    
+    # Calculate average session duration
+    completed_sessions = UserSession.query.filter(
+        UserSession.session_end.isnot(None)
+    ).all()
+    
+    total_duration = timedelta()
+    session_count = len(completed_sessions)
+    for session in completed_sessions:
+        duration = session.session_end - session.session_start
+        total_duration += duration
+    
+    avg_duration = str(total_duration / session_count if session_count > 0 else timedelta())
+    
+    # Most used features (based on recommendations)
+    feature_usage = db.session.query(
+        func.count(Recommendation.id).label('count')
+    ).filter(Recommendation.created_at >= week_ago).scalar()
+    
+    # Calculate average rating per day
+    daily_ratings = db.session.query(
+        func.date(Recommendation.created_at).label('date'),
+        func.avg(Recommendation.rating).label('avg_rating')
+    ).filter(
+        Recommendation.rating.isnot(None),
+        Recommendation.created_at >= week_ago
+    ).group_by(func.date(Recommendation.created_at))\
+    .order_by(func.date(Recommendation.created_at)).all()
+    
     stats = {
         'total_users': User.query.count(),
         'total_recommendations': Recommendation.query.count(),
-        'average_rating': db.session.query(db.func.avg(Recommendation.rating)).scalar() or 0,
-        'active_sessions': active_sessions
+        'average_rating': db.session.query(func.avg(Recommendation.rating)).scalar() or 0,
+        'active_sessions': active_sessions,
+        'daily_users': daily_users,
+        'avg_session_duration': avg_duration,
+        'weekly_feature_usage': feature_usage,
+        'daily_ratings': daily_ratings
     }
-    return render_template('admin/dashboard.html', users=users, recommendations=recommendations, stats=stats)
+    
+    return render_template('admin/dashboard.html', 
+                         users=users, 
+                         recommendations=recommendations, 
+                         stats=stats)
 
 @app.route('/get_recommendations', methods=['POST'])
 def get_recommendations():

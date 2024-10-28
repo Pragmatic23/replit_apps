@@ -20,19 +20,122 @@
                         Describe Your Business Requirements
                     </h2>
                     <form action="/get_recommendations" method="POST">
+                        <!-- Industry Selection -->
+                        <div class="mb-3">
+                            <label for="industry" class="form-label">
+                                <i class="fas fa-industry me-2"></i>
+                                Industry
+                            </label>
+                            <select class="form-select" id="industry" name="industry" required>
+                                <option value="">Select your industry</option>
+                                <option value="manufacturing">Manufacturing</option>
+                                <option value="retail">Retail & E-commerce</option>
+                                <option value="services">Professional Services</option>
+                                <option value="healthcare">Healthcare</option>
+                                <option value="education">Education</option>
+                                <option value="hospitality">Hospitality</option>
+                                <option value="construction">Construction</option>
+                                <option value="technology">Technology</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <!-- Company Size -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-users me-2"></i>
+                                Company Size
+                            </label>
+                            <div class="btn-group d-flex" role="group">
+                                <input type="radio" class="btn-check" name="company_size" id="size1" value="small" required>
+                                <label class="btn btn-outline-secondary" for="size1">1-50</label>
+                                
+                                <input type="radio" class="btn-check" name="company_size" id="size2" value="medium">
+                                <label class="btn btn-outline-secondary" for="size2">51-200</label>
+                                
+                                <input type="radio" class="btn-check" name="company_size" id="size3" value="large">
+                                <label class="btn btn-outline-secondary" for="size3">201+</label>
+                            </div>
+                        </div>
+
+                        <!-- Budget Range -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-dollar-sign me-2"></i>
+                                Budget Range
+                            </label>
+                            <div class="btn-group d-flex" role="group">
+                                <input type="radio" class="btn-check" name="budget" id="budget1" value="low" required>
+                                <label class="btn btn-outline-secondary" for="budget1">Basic</label>
+                                
+                                <input type="radio" class="btn-check" name="budget" id="budget2" value="medium">
+                                <label class="btn btn-outline-secondary" for="budget2">Standard</label>
+                                
+                                <input type="radio" class="btn-check" name="budget" id="budget3" value="high">
+                                <label class="btn btn-outline-secondary" for="budget3">Enterprise</label>
+                            </div>
+                        </div>
+
+                        <!-- Feature Requirements -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-check-square me-2"></i>
+                                Key Features Required
+                            </label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="features" value="inventory" id="feature1">
+                                        <label class="form-check-label" for="feature1">Inventory Management</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="features" value="accounting" id="feature2">
+                                        <label class="form-check-label" for="feature2">Accounting</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="features" value="crm" id="feature3">
+                                        <label class="form-check-label" for="feature3">CRM</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="features" value="hr" id="feature4">
+                                        <label class="form-check-label" for="feature4">HR Management</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="features" value="ecommerce" id="feature5">
+                                        <label class="form-check-label" for="feature5">E-commerce</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="features" value="manufacturing" id="feature6">
+                                        <label class="form-check-label" for="feature6">Manufacturing</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Requirements -->
                         <div class="mb-4">
                             <label for="requirements" class="form-label">
                                 <i class="fas fa-lightbulb me-2"></i>
-                                What features or functionality do you need in your Odoo system?
+                                Additional Requirements or Specific Needs
                             </label>
                             <textarea 
                                 class="form-control" 
                                 id="requirements" 
                                 name="requirements" 
-                                rows="6" 
-                                placeholder="Example: I need a system to manage my e-commerce business with inventory tracking, customer management, and accounting features..."
-                                required></textarea>
+                                rows="4" 
+                                placeholder="Describe any specific requirements or challenges your business faces..."></textarea>
                         </div>
+
                         <div class="text-center">
                             <button type="submit" class="btn btn-primary btn-lg">
                                 <i class="fas fa-magic me-2"></i>

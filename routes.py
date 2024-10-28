@@ -50,7 +50,6 @@ def login():
         
         if user and user.check_password(password):
             login_user(user)
-            # Create new session on login
             get_or_create_user_session()
             return redirect(url_for('dashboard'))
         flash('Invalid email or password')
@@ -86,7 +85,6 @@ def signup():
         db.session.commit()
         
         login_user(user)
-        # Create new session for new user
         get_or_create_user_session()
         return redirect(url_for('dashboard'))
     
@@ -95,7 +93,6 @@ def signup():
 @app.route('/logout')
 @login_required
 def logout():
-    # End current session
     active_session = UserSession.query.filter_by(
         user_id=current_user.id,
         session_end=None
@@ -110,7 +107,6 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Update session activity
     get_or_create_user_session()
     user_recommendations = Recommendation.query.filter_by(user_id=current_user.id).order_by(Recommendation.created_at.desc()).all()
     return render_template('user/dashboard.html', recommendations=user_recommendations)
@@ -118,7 +114,6 @@ def dashboard():
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-    # Update session activity
     get_or_create_user_session()
     if request.method == 'POST':
         current_user.username = request.form.get('username')
@@ -145,18 +140,40 @@ def admin_dashboard():
 
 @app.route('/get_recommendations', methods=['POST'])
 def get_recommendations():
-    requirements = request.form.get('requirements')
-    if not requirements:
-        return "Please provide your requirements", 400
+    requirements = request.form.get('requirements', '')
+    industry = request.form.get('industry', '')
+    company_size = request.form.get('company_size', '')
+    budget = request.form.get('budget', '')
+    features = request.form.getlist('features')
 
-    recommendations = get_module_recommendations(requirements)
+    if not industry or not company_size or not budget:
+        flash('Please fill in all required fields')
+        return redirect(url_for('index'))
+
+    recommendations = get_module_recommendations(
+        requirements=requirements,
+        industry=industry,
+        company_size=company_size,
+        budget=budget,
+        features=features
+    )
+    
     recommendation_id = None
     
-    # Save recommendation if user is logged in
     if current_user.is_authenticated:
         active_session = get_or_create_user_session()
+        full_context = f"""
+Industry: {industry}
+Company Size: {company_size}
+Budget Level: {budget}
+Features: {', '.join(features) if features else 'None'}
+Additional Requirements: {requirements}
+
+Recommendations:
+{recommendations}
+"""
         recommendation = Recommendation(
-            requirements=requirements,
+            requirements=full_context,
             recommendations=recommendations,
             user_id=current_user.id,
             session_id=active_session.id if active_session else None
@@ -182,7 +199,6 @@ def submit_feedback():
         
     recommendation = Recommendation.query.get_or_404(recommendation_id)
     
-    # Ensure the recommendation belongs to the current user
     if recommendation.user_id != current_user.id:
         abort(403)
         

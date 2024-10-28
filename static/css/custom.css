@@ -31,7 +31,8 @@ body {
     background: var(--card-gradient);
     border: 1px solid rgba(138, 43, 226, 0.2);
     border-radius: 12px;
-    padding: 1.5rem;
+    padding: 1rem;
+    max-width: 200px;
     aspect-ratio: 1;
     display: flex;
     flex-direction: column;
@@ -41,6 +42,7 @@ body {
     transition: all 0.3s ease;
     animation: fadeInUp 0.6s ease-out;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
 }
 
 .module-card:hover {
@@ -50,9 +52,9 @@ body {
 }
 
 .module-icon {
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     color: var(--purple-accent);
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     opacity: 0.9;
     transition: opacity 0.3s ease;
 }
@@ -62,9 +64,9 @@ body {
 }
 
 .module-title {
-    font-size: 1.2rem;
+    font-size: 1rem;
     font-weight: 600;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     color: var(--bs-light);
     letter-spacing: 0.5px;
 }
@@ -72,7 +74,7 @@ body {
 .module-description {
     color: var(--bs-secondary-text);
     margin-bottom: 0;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     line-height: 1.4;
 }
 

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="card-title">Recommended Modules</h3>
+                <p class="card-text">{{ recommendations.summary }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% for module in recommendations.modules %}
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h4 class="card-title">{{ module.name }}</h4>
+                <p class="card-text">{{ module.description }}</p>
+                <h5>Key Features:</h5>
+                <ul>
+                    {% for feature in module.key_features %}
+                    <li>{{ feature }}</li>
+                    {% endfor %}
+                </ul>
+                <p><strong>Category:</strong> {{ module.category }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h4>Provide Feedback</h4>
+                <form id="feedbackForm">
+                    <input type="hidden" name="recommendation_id" value="{{ recommendation_id }}">
+                    <div class="mb-3">
+                        <label class="form-label">Rating</label>
+                        <div class="rating">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="rating" value="{{ i }}" id="star{{ i }}">
+                            <label for="star{{ i }}">{{ i }}</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="feedback" class="form-label">Comments</label>
+                        <textarea class="form-control" id="feedback" name="feedback" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit Feedback</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title mb-4">Describe Your Business Requirements</h2>
+                <form action="/get_recommendations" method="POST">
+                    <div class="mb-3">
+                        <label for="requirements" class="form-label">What features or functionality do you need in your Odoo system?</label>
+                        <textarea 
+                            class="form-control" 
+                            id="requirements" 
+                            name="requirements" 
+                            rows="6" 
+                            placeholder="Example: I need a system to manage my e-commerce business with inventory tracking, customer management, and accounting features..."
+                            required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Get Recommendations</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -18,7 +18,7 @@
             <div class="card">
                 <div class="card-body">
                     <h2 class="card-title text-center mb-4">
-                        <i class="fas fa-list-check me-2"></i>
+                        <i class="fas fa-cube me-2"></i>
                         Recommended Modules
                     </h2>
                     {% if recommendations and recommendations.startswith('Error') %}
@@ -30,12 +30,12 @@
                         <div class="row g-4" id="moduleContainer">
                             {% if recommendations %}
                                 {% set modules = recommendations.split('\n\n') %}
-                                {% for module in modules %}
+                                {% for module in modules[:4] %}
                                     {% if module.strip() %}
                                         {% set lines = module.split('\n') %}
                                         {% set module_name = lines[0].replace('- ', '').strip() %}
                                         <div class="col-md-6">
-                                            <div class="module-card">
+                                            <div class="module-card h-100">
                                                 <div class="module-icon">
                                                     <i class="fas fa-cube"></i>
                                                 </div>
@@ -45,12 +45,14 @@
                                                         <p class="module-description">{{ line.replace('- ', '').strip() }}</p>
                                                     {% endif %}
                                                 {% endfor %}
-                                                <a href="https://apps.odoo.com/apps/modules/browse?search={{ module_name|urlencode }}" 
-                                                   class="btn btn-outline-primary mt-auto" 
-                                                   target="_blank">
-                                                    <i class="fas fa-external-link-alt me-2"></i>
-                                                    View in Odoo Apps Store
-                                                </a>
+                                                <div class="mt-auto text-center">
+                                                    <a href="https://apps.odoo.com/apps/modules/browse?search={{ module_name|urlencode }}" 
+                                                       class="btn btn-outline-primary" 
+                                                       target="_blank">
+                                                        <i class="fas fa-external-link-alt me-2"></i>
+                                                        View in Odoo Apps Store
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
                                     {% endif %}

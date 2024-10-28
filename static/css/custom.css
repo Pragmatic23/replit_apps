@@ -31,18 +31,9 @@ body {
     background: var(--card-gradient);
     border: 1px solid rgba(138, 43, 226, 0.2);
     border-radius: 12px;
-    padding: 1rem;
-    max-width: 200px;
-    aspect-ratio: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
     transition: all 0.3s ease;
     animation: fadeInUp 0.6s ease-out;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    margin: 0 auto;
 }
 
 .module-card:hover {
@@ -54,7 +45,6 @@ body {
 .module-icon {
     font-size: 1.8rem;
     color: var(--purple-accent);
-    margin-bottom: 0.75rem;
     opacity: 0.9;
     transition: opacity 0.3s ease;
 }
@@ -63,19 +53,28 @@ body {
     opacity: 1;
 }
 
-.module-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    color: var(--bs-light);
-    letter-spacing: 0.5px;
+/* Module content styles */
+.module-content {
+    font-size: 0.95rem;
+    line-height: 1.6;
 }
 
-.module-description {
-    color: var(--bs-secondary-text);
-    margin-bottom: 0;
-    font-size: 0.85rem;
-    line-height: 1.4;
+.module-content h1,
+.module-content h2,
+.module-content h3,
+.module-content h4 {
+    color: var(--bs-light);
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.module-content ul {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.module-content li {
+    margin-bottom: 0.5rem;
 }
 
 /* Star Rating */

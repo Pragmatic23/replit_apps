@@ -32,16 +32,27 @@
                                 {% set modules = recommendations.split('\n\n') %}
                                 {% for module in modules %}
                                     {% if module.strip() %}
-                                        {% set lines = module.split('\n') %}
-                                        {% set module_name = lines[0].strip('- ').strip() %}
-                                        {% set description = lines[1].strip('- ').strip() if lines|length > 1 else '' %}
-                                        <div class="col-md-6">
-                                            <div class="module-card mx-auto">
-                                                <div class="module-icon">
-                                                    <i class="fas fa-cube"></i>
+                                        <div class="col-12 mb-4">
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <div class="module-icon me-3">
+                                                            <i class="fas fa-cube"></i>
+                                                        </div>
+                                                        <h3 class="card-title mb-0">
+                                                            {% set module_lines = module.split('\n') %}
+                                                            {% for line in module_lines %}
+                                                                {% if '# ' in line or '### ' in line %}
+                                                                    {{ line.split('# ')[-1].split('### ')[-1] }}
+                                                                    {% break %}
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </h3>
+                                                    </div>
+                                                    <div class="module-content">
+                                                        {{ module | replace('\n', '<br>') | safe }}
+                                                    </div>
                                                 </div>
-                                                <h3 class="module-title">{{ module_name }}</h3>
-                                                <p class="module-description">{{ description }}</p>
                                             </div>
                                         </div>
                                     {% endif %}

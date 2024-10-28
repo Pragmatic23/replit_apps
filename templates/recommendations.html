@@ -38,9 +38,9 @@
                                                     <i class="fas fa-cube module-icon"></i>
                                                 </div>
                                                 {% set lines = module.strip().split('\n') %}
-                                                <h4 class="module-title text-center mb-3">{{ lines[0].strip() }}</h4>
+                                                <h4 class="module-title text-center mb-3">{{ lines[0].strip().replace('*', '').replace('#', '').replace('-', '').strip() }}</h4>
                                                 {% if lines|length > 1 %}
-                                                    <p class="module-description text-center">{{ lines[1].strip() }}</p>
+                                                    <p class="module-description text-center">{{ lines[1].strip().replace('*', '').replace('#', '').replace('-', '').strip() }}</p>
                                                 {% endif %}
                                             </div>
                                         </div>

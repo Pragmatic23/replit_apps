@@ -1,5 +1,4 @@
 import os
-from functools import lru_cache
 from openai import OpenAI
 from typing import List, Optional
 
@@ -11,22 +10,29 @@ def format_features(features: Optional[List[str]]) -> str:
         return "No specific features selected"
     return ", ".join(features)
 
-@lru_cache(maxsize=100)
 def get_module_recommendations(
-    requirements: str,
+    requirements: str = "",
     industry: str = "",
     company_size: str = "",
     budget: str = "",
     features: Optional[List[str]] = None
 ) -> str:
-    # Create a detailed context from the filters
-    context = f"""Industry: {industry}
-Company Size: {company_size}
-Budget Level: {budget}
-Required Features: {format_features(features) if features else 'No specific features selected'}
-Additional Requirements: {requirements}"""
+    try:
+        # Create a detailed context from the filters
+        context_parts = []
+        if industry:
+            context_parts.append(f"Industry: {industry}")
+        if company_size:
+            context_parts.append(f"Company Size: {company_size}")
+        if budget:
+            context_parts.append(f"Budget Level: {budget}")
+        context_parts.append(f"Required Features: {format_features(features)}")
+        if requirements:
+            context_parts.append(f"Additional Requirements: {requirements}")
+        
+        context = "\n".join(context_parts)
 
-    prompt = f"""Based on the following business context, recommend 4 most suitable Odoo modules.
+        prompt = f"""Based on the following business context, recommend 4 most suitable Odoo modules.
 Consider the company's industry, size, budget constraints, and specific feature requirements.
 For each recommended module, provide:
 - Module name (without any ## or **)
@@ -42,7 +48,6 @@ Please ensure the recommendations are:
 4. Address the required features
 5. Compatible with each other"""
     
-    try:
         if not OPENAI_API_KEY:
             return "Error: OpenAI API key is not configured"
             
@@ -58,4 +63,4 @@ Please ensure the recommendations are:
             
         return response.choices[0].message.content
     except Exception as e:
-        return f"Error occurred during processing: {str(e)}"
+        return f"Error: Unable to generate recommendations. Please try again later. Details: {str(e)}"

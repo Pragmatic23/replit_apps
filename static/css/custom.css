@@ -27,68 +27,95 @@ body {
 }
 
 /* Module card styles */
+.row.g-4 {
+    margin: -1rem;
+}
+
 .module-card {
-    aspect-ratio: 1;
-    height: 250px;
-    width: 250px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    margin: 0 auto;
+    height: 100%;
     background: var(--card-gradient);
     border: 1px solid rgba(138, 43, 226, 0.2);
     border-radius: 12px;
     transition: all 0.3s ease;
     animation: fadeInUp 0.6s ease-out;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    padding: 1rem;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
 }
 
 .module-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 12px rgba(138, 43, 226, 0.15);
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(138, 43, 226, 0.2);
     border-color: var(--purple-accent);
 }
 
 .module-title {
-    font-size: 1.2rem;
-    line-height: 1.2;
-    margin-bottom: 0.5rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 1rem 0;
+    color: var(--bs-light);
 }
 
 .module-description {
-    font-size: 0.9rem;
-    line-height: 1.4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--bs-gray-300);
+    margin-bottom: 0;
 }
 
 .module-icon {
-    font-size: 2rem;
+    font-size: 2.5rem;
     color: var(--purple-accent);
-    opacity: 0.9;
-    transition: opacity 0.3s ease;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    transition: transform 0.3s ease;
 }
 
 .module-card:hover .module-icon {
-    opacity: 1;
+    transform: scale(1.1);
 }
 
-/* Star Rating */
+/* Loading spinner */
+.loading-spinner {
+    display: none;
+    text-align: center;
+    padding: 3rem 0;
+}
+
+.loading-spinner.active {
+    display: block;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.loading-spinner .spinner-border {
+    width: 4rem;
+    height: 4rem;
+    color: var(--purple-accent);
+}
+
+.loading-spinner p {
+    margin-top: 1.5rem;
+    color: var(--bs-gray-300);
+    font-size: 1.1rem;
+}
+
+/* Feedback Form */
+.feedback-form {
+    background: var(--card-gradient);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 3rem;
+    border: 1px solid rgba(138, 43, 226, 0.2);
+    animation: fadeIn 0.6s ease-out;
+}
+
 .rating {
     display: inline-flex;
     flex-direction: row-reverse;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    margin: 1rem 0;
 }
 
 .rating input {
@@ -98,50 +125,42 @@ body {
 .rating label {
     cursor: pointer;
     font-size: 2rem;
-    color: var(--bs-secondary);
-    transition: color 0.2s ease;
-}
-
-.rating input:checked ~ label {
-    color: var(--purple-accent);
+    color: var(--bs-gray-600);
+    transition: all 0.2s ease;
 }
 
 .rating label:hover,
-.rating label:hover ~ label {
+.rating label:hover ~ label,
+.rating input:checked ~ label {
     color: var(--purple-accent);
-}
-
-/* Loading Animation */
-.loading-spinner {
-    display: none;
-    text-align: center;
-    padding: 2rem;
-}
-
-.loading-spinner.active {
-    display: block;
-    animation: fadeIn 0.3s ease-out;
-}
-
-/* Feedback Form */
-.feedback-form {
-    background: var(--card-gradient);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-top: 2rem;
-    border: 1px solid rgba(138, 43, 226, 0.2);
+    transform: scale(1.1);
 }
 
 .feedback-form textarea {
     background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(138, 43, 226, 0.2);
+    border: 1px solid rgba(138, 43, 226, 0.2);
     color: var(--bs-light);
+    transition: all 0.3s ease;
 }
 
 .feedback-form textarea:focus {
     background: rgba(255, 255, 255, 0.1);
     border-color: var(--purple-accent);
     box-shadow: 0 0 0 0.25rem rgba(138, 43, 226, 0.25);
+}
+
+/* Buttons */
+.btn-primary {
+    background: var(--purple-accent);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: #9d3cf7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(138, 43, 226, 0.3);
 }
 
 /* Animations */

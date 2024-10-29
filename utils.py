@@ -26,19 +26,25 @@ def get_module_recommendations(
         
         context = "\n".join(context_parts)
 
-        prompt = f"""Based on the following business context, recommend 4 most suitable Odoo modules.
-Consider the company's industry and specific feature requirements.
-For each recommended module, provide:
-- Module name (without any ## or **)
-- One line description of core purpose (without any formatting)
+        prompt = f'''As an Odoo technical consultant with extensive experience, recommend 4 official Odoo modules that best address the following business requirements.
 
 Business Context:
 {context}
 
-Please ensure the recommendations are:
-1. Suitable for the specified industry
-2. Address the required features
-3. Compatible with each other"""
+For each module provide:
+1. Module Name (official Odoo module name)
+2. One-line description highlighting the core business value and primary use case
+
+Important considerations:
+- Recommend only official Odoo modules from the Odoo Apps store
+- Focus on modules that integrate well with each other
+- Consider scalability and future business growth
+- Prioritize modules based on the industry-specific needs
+- Take into account the required features for the best fit
+
+Present each recommendation in a clear, structured format:
+[Module Name]
+[Concise description focused on business value]'''
     
         if not OPENAI_API_KEY:
             return "Error: OpenAI API key is not configured"

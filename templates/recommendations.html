@@ -20,57 +20,119 @@
                         Recommended Modules
                     </h2>
 
-                    {% if recommendations and recommendations.startswith('Error') %}
+                    {% if recommendations.error %}
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-circle me-2"></i>
-                            {{ recommendations }}
+                            {{ recommendations.error }}
                         </div>
                     {% else %}
                         <div class="row g-4">
-                            {% if recommendations %}
-                                {% set modules = recommendations.split('\n\n') %}
-                                {% for module in modules %}
-                                    {% if module.strip() %}
-                                        <div class="col-md-6">
-                                            <div class="module-card h-100">
-                                                <i class="fas fa-cube module-icon"></i>
-                                                {% set lines = module.strip().split('\n') %}
-                                                <h3 class="module-title">
-                                                    {{ lines[0].strip().replace('*', '').replace('#', '').replace('-', '').strip() }}
-                                                </h3>
-                                                {% if lines|length > 1 %}
-                                                    <p class="module-description">
-                                                        {{ lines[1].strip().replace('*', '').replace('#', '').replace('-', '').strip() }}
-                                                    </p>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    {% endif %}
-                                {% endfor %}
-                            {% endif %}
+                            {% for module in recommendations.modules %}
+                                <div class="col-md-6">
+                                    <div class="module-card h-100">
+                                        {% if module.image %}
+                                            <img src="{{ module.image }}" alt="{{ module.name }}" class="module-image mb-3">
+                                        {% else %}
+                                            <i class="fas fa-cube module-icon"></i>
+                                        {% endif %}
+                                        <h3 class="module-title">
+                                            {% if module.url %}
+                                                <a href="{{ module.url }}" target="_blank" class="text-decoration-none">
+                                                    {{ module.name }}
+                                                    <i class="fas fa-external-link-alt ms-2"></i>
+                                                </a>
+                                            {% else %}
+                                                {{ module.name }}
+                                            {% endif %}
+                                        </h3>
+                                        <p class="module-description">
+                                            {{ module.description }}
+                                        </p>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
                         
                         {% if current_user.is_authenticated and recommendation_id %}
                             <div class="feedback-form">
                                 <h4 class="text-center mb-3">How helpful was this recommendation?</h4>
-                                <form method="POST" action="/submit_feedback" class="text-center">
+                                <form method="POST" action="/submit_feedback" class="text-center" enctype="multipart/form-data">
                                     <input type="hidden" name="recommendation_id" value="{{ recommendation_id }}">
-                                    <div class="rating mb-4">
-                                        {% for i in range(5, 0, -1) %}
-                                            <input type="radio" name="rating" id="star{{ i }}" value="{{ i }}" required>
-                                            <label for="star{{ i }}">
-                                                <i class="fas fa-star"></i>
-                                            </label>
-                                        {% endfor %}
-                                    </div>
+                                    
+                                    <!-- Overall Rating -->
                                     <div class="mb-4">
+                                        <label class="form-label">Overall Rating</label>
+                                        <div class="rating">
+                                            {% for i in range(5, 0, -1) %}
+                                                <input type="radio" name="overall_rating" id="star{{ i }}" value="{{ i }}" required>
+                                                <label for="star{{ i }}">
+                                                    <i class="fas fa-star"></i>
+                                                </label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Detailed Ratings -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Ease of Use</label>
+                                            <select name="ease_of_use" class="form-select">
+                                                <option value="">Select rating</option>
+                                                {% for i in range(1, 6) %}
+                                                    <option value="{{ i }}">{{ i }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Features</label>
+                                            <select name="features_rating" class="form-select">
+                                                <option value="">Select rating</option>
+                                                {% for i in range(1, 6) %}
+                                                    <option value="{{ i }}">{{ i }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Integration</label>
+                                            <select name="integration_rating" class="form-select">
+                                                <option value="">Select rating</option>
+                                                {% for i in range(1, 6) %}
+                                                    <option value="{{ i }}">{{ i }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Feedback Category -->
+                                    <div class="mb-4">
+                                        <label class="form-label">Feedback Category</label>
+                                        <select name="feedback_category" class="form-select">
+                                            <option value="">Select category</option>
+                                            <option value="accuracy">Recommendation Accuracy</option>
+                                            <option value="usefulness">Usefulness</option>
+                                            <option value="clarity">Clarity</option>
+                                            <option value="technical">Technical Issues</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Detailed Feedback -->
+                                    <div class="mb-4">
+                                        <label class="form-label">Detailed Feedback</label>
                                         <textarea 
                                             name="feedback" 
                                             class="form-control" 
                                             rows="3" 
-                                            placeholder="Your feedback helps us improve our recommendations (optional)">
+                                            placeholder="Your feedback helps us improve our recommendations">
                                         </textarea>
                                     </div>
+
+                                    <!-- Screenshot Upload -->
+                                    <div class="mb-4">
+                                        <label class="form-label">Upload Screenshot (optional)</label>
+                                        <input type="file" name="screenshot" class="form-control" accept="image/*">
+                                    </div>
+
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-paper-plane me-2"></i>
                                         Submit Feedback
@@ -81,6 +143,12 @@
                     {% endif %}
                     
                     <div class="mt-4 text-center">
+                        {% if recommendation_id %}
+                            <a href="{{ url_for('export_recommendations', recommendation_id=recommendation_id) }}" class="btn btn-secondary me-2">
+                                <i class="fas fa-file-pdf me-2"></i>
+                                Export as PDF
+                            </a>
+                        {% endif %}
                         <a href="/" class="btn btn-primary">
                             <i class="fas fa-redo me-2"></i>
                             Try Another Search

@@ -12,4 +12,9 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "openai>=1.52.2",
     "werkzeug>=3.0.6",
+    "beautifulsoup4>=4.12.3",
+    "requests>=2.32.3",
+    "pillow>=11.0.0",
+    "reportlab>=4.2.5",
+    "qrcode>=8.0",
 ]

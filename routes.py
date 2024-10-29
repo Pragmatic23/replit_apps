@@ -1,4 +1,3 @@
-# Import existing imports
 from functools import wraps
 from datetime import datetime, timedelta
 from flask import render_template, request, redirect, url_for, flash, abort, jsonify, send_file
@@ -21,27 +20,21 @@ UPLOAD_FOLDER = 'static/uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            abort(403)
-        return f(*args, **kwargs)
-    return decorated_function
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
 @app.route('/get_recommendations', methods=['POST'])
 @login_required
 def get_recommendations():
-    # Get basic requirements
+    # Get all form fields
     industry = request.form.get('industry')
     features = request.form.getlist('features')
     requirements = request.form.get('requirements', '')
     
-    # Get additional Odoo-specific requirements
+    # Get new fields
+    customer_website = request.form.get('customer_website', '')
+    has_odoo_experience = request.form.get('has_odoo_experience')
+    preferred_edition = request.form.get('preferred_edition')
+    current_version = request.form.get('current_version')
+    
+    # Get existing additional fields
     company_size = request.form.get('company_size')
     budget = request.form.get('budget')
     deployment = request.form.get('deployment')
@@ -49,24 +42,22 @@ def get_recommendations():
     integrations = request.form.getlist('integrations')
     languages = request.form.getlist('languages')
     
-    # Get new Odoo experience and setup fields
-    odoo_experience = request.form.get('odoo_experience')
-    current_version = request.form.get('current_version')
-    setup_type = request.form.get('setup_type')
-    timeline = request.form.get('timeline')
-    
     # Create a detailed requirements string
     detailed_requirements = f"""
-Odoo Experience Level: {odoo_experience}
-Current Odoo Version: {current_version or 'Not using Odoo'}
-Setup Type: {setup_type}
-Implementation Timeline: {timeline}
-
+Business Information:
 Industry: {industry}
 Company Size: {company_size}
+Customer Website: {customer_website}
 Budget Range: {budget}
-Deployment Type: {deployment}
 Geographic Region: {region}
+
+Odoo Experience and Preferences:
+Previous Odoo Experience: {has_odoo_experience}
+Preferred Edition: {preferred_edition}
+Current Version: {current_version or 'Not using Odoo'}
+Deployment Type: {deployment}
+
+Technical Requirements:
 Required Features: {', '.join(features) if features else 'None specified'}
 Integration Requirements: {', '.join(integrations) if integrations else 'None specified'}
 Language Requirements: {', '.join(languages) if languages else 'English only'}
@@ -75,13 +66,16 @@ Additional Requirements:
 {requirements}
 """
     
+    # Get recommendations with updated context
     recommendations = get_module_recommendations(
         requirements=detailed_requirements,
         industry=industry,
-        features=features
+        features=features,
+        preferred_edition=preferred_edition,
+        has_experience=has_odoo_experience
     )
     
-    # Create a new recommendation record if successful
+    # Create recommendation record if successful
     if not recommendations.get('error'):
         recommendation = Recommendation(
             requirements=detailed_requirements,
@@ -99,4 +93,4 @@ Additional Requirements:
     
     return render_template('recommendations.html', recommendations=recommendations)
 
-# Rest of the routes remain unchanged...
+# Keep other routes unchanged

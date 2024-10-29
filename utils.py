@@ -40,13 +40,21 @@ def get_module_info(module_name: str) -> Tuple[str, str]:
 
 def get_module_recommendations(requirements: str = "",
                              industry: str = "",
-                             features: Optional[List[str]] = None) -> Dict:
+                             features: Optional[List[str]] = None,
+                             preferred_edition: str = "community",
+                             has_experience: str = "no") -> Dict:
     try:
         # Create a detailed context from the filters
         context_parts = []
         if industry:
             context_parts.append(f"Industry: {industry}")
-        context_parts.append(f"Required Features: {format_features(features)}")
+        if features:
+            context_parts.append(f"Required Features: {format_features(features)}")
+        
+        # Add edition preference and experience level to context
+        context_parts.append(f"Preferred Edition: {preferred_edition.title()}")
+        context_parts.append(f"Previous Odoo Experience: {'Yes' if has_experience == 'yes' else 'No'}")
+        
         if requirements:
             context_parts.append(f"Additional Requirements: {requirements}")
 
@@ -67,6 +75,10 @@ Important considerations:
 - Consider scalability and future business growth
 - Prioritize modules based on the industry-specific needs
 - Take into account the required features for the best fit
+- Consider the user's Odoo experience level when suggesting modules
+- Ensure recommendations align with the preferred Odoo edition (Community/Enterprise)
+- For users new to Odoo, prioritize more user-friendly modules
+- For experienced users, consider more advanced modules if appropriate
 
 Present each recommendation in a clear, structured format:
 Module Name
@@ -85,7 +97,6 @@ Module Name
         if not response.choices[0].message.content:
             return {"error": "No recommendations generated"}
 
-        # Process recommendations and fetch module info
         recommendations = response.choices[0].message.content
         modules = []
         urls = {}

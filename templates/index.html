@@ -40,6 +40,74 @@
                             </select>
                         </div>
 
+                        <!-- Company Size -->
+                        <div class="mb-3">
+                            <label for="company_size" class="form-label">
+                                <i class="fas fa-users me-2"></i>
+                                Company Size
+                            </label>
+                            <select class="form-select" id="company_size" name="company_size" required>
+                                <option value="">Select company size</option>
+                                <option value="1-10">1-10 employees</option>
+                                <option value="11-50">11-50 employees</option>
+                                <option value="51-200">51-200 employees</option>
+                                <option value="201-500">201-500 employees</option>
+                                <option value="501+">501+ employees</option>
+                            </select>
+                        </div>
+
+                        <!-- Budget Range -->
+                        <div class="mb-3">
+                            <label for="budget" class="form-label">
+                                <i class="fas fa-dollar-sign me-2"></i>
+                                Budget Range (Annual)
+                            </label>
+                            <select class="form-select" id="budget" name="budget" required>
+                                <option value="">Select budget range</option>
+                                <option value="0-1000">$0 - $1,000</option>
+                                <option value="1001-5000">$1,001 - $5,000</option>
+                                <option value="5001-10000">$5,001 - $10,000</option>
+                                <option value="10001-50000">$10,001 - $50,000</option>
+                                <option value="50001+">$50,001+</option>
+                            </select>
+                        </div>
+
+                        <!-- Deployment Type -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-cloud me-2"></i>
+                                Deployment Preference
+                            </label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="deployment" id="cloud" value="cloud" required>
+                                <label class="form-check-label" for="cloud">
+                                    Cloud-hosted (Odoo.sh or Odoo Online)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="deployment" id="onpremise" value="onpremise">
+                                <label class="form-check-label" for="onpremise">
+                                    On-premise
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Geographic Region -->
+                        <div class="mb-3">
+                            <label for="region" class="form-label">
+                                <i class="fas fa-globe me-2"></i>
+                                Primary Geographic Region
+                            </label>
+                            <select class="form-select" id="region" name="region" required>
+                                <option value="">Select region</option>
+                                <option value="north_america">North America</option>
+                                <option value="europe">Europe</option>
+                                <option value="asia_pacific">Asia Pacific</option>
+                                <option value="latin_america">Latin America</option>
+                                <option value="middle_east">Middle East & Africa</option>
+                            </select>
+                        </div>
+
                         <!-- Feature Requirements -->
                         <div class="mb-3">
                             <label class="form-label">
@@ -81,6 +149,86 @@
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" name="features" value="manufacturing" id="feature6">
                                         <label class="form-check-label" for="feature6">Manufacturing</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Integration Requirements -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-plug me-2"></i>
+                                Integration Requirements
+                            </label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="integrations" value="payment_gateway" id="integration1">
+                                        <label class="form-check-label" for="integration1">Payment Gateways</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="integrations" value="shipping" id="integration2">
+                                        <label class="form-check-label" for="integration2">Shipping Providers</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="integrations" value="marketplace" id="integration3">
+                                        <label class="form-check-label" for="integration3">Marketplace Integration</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="integrations" value="erp" id="integration4">
+                                        <label class="form-check-label" for="integration4">External ERP Systems</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Language Requirements -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-language me-2"></i>
+                                Required Languages
+                            </label>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="languages" value="english" id="lang1" checked disabled>
+                                        <label class="form-check-label" for="lang1">English</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="languages" value="spanish" id="lang2">
+                                        <label class="form-check-label" for="lang2">Spanish</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="languages" value="french" id="lang3">
+                                        <label class="form-check-label" for="lang3">French</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="languages" value="german" id="lang4">
+                                        <label class="form-check-label" for="lang4">German</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="languages" value="chinese" id="lang5">
+                                        <label class="form-check-label" for="lang5">Chinese</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="languages" value="arabic" id="lang6">
+                                        <label class="form-check-label" for="lang6">Arabic</label>
                                     </div>
                                 </div>
                             </div>

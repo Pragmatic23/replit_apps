@@ -49,8 +49,19 @@ def get_recommendations():
     integrations = request.form.getlist('integrations')
     languages = request.form.getlist('languages')
     
+    # Get new Odoo experience and setup fields
+    odoo_experience = request.form.get('odoo_experience')
+    current_version = request.form.get('current_version')
+    setup_type = request.form.get('setup_type')
+    timeline = request.form.get('timeline')
+    
     # Create a detailed requirements string
     detailed_requirements = f"""
+Odoo Experience Level: {odoo_experience}
+Current Odoo Version: {current_version or 'Not using Odoo'}
+Setup Type: {setup_type}
+Implementation Timeline: {timeline}
+
 Industry: {industry}
 Company Size: {company_size}
 Budget Range: {budget}

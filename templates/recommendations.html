@@ -26,22 +26,24 @@
                             {{ recommendations }}
                         </div>
                     {% else %}
-                        <div class="recommendations-list">
+                        <div class="row g-4">
                             {% if recommendations %}
                                 {% set modules = recommendations.split('\n\n') %}
                                 {% for module in modules %}
                                     {% if module.strip() %}
-                                        <div class="module-item">
-                                            <i class="fas fa-cube module-icon"></i>
-                                            {% set lines = module.strip().split('\n') %}
-                                            <h3 class="module-name">
-                                                {{ lines[0].strip().replace('*', '').replace('#', '').replace('[', '').replace(']', '').replace('-', '').strip() }}
-                                            </h3>
-                                            {% if lines|length > 1 %}
-                                                <p class="module-desc">
-                                                    {{ lines[1].strip().replace('*', '').replace('#', '').replace('[', '').replace(']', '').replace('-', '').strip() }}
-                                                </p>
-                                            {% endif %}
+                                        <div class="col-md-6">
+                                            <div class="module-card h-100">
+                                                <i class="fas fa-cube module-icon"></i>
+                                                {% set lines = module.strip().split('\n') %}
+                                                <h3 class="module-title">
+                                                    {{ lines[0].strip().replace('*', '').replace('#', '').replace('-', '').strip() }}
+                                                </h3>
+                                                {% if lines|length > 1 %}
+                                                    <p class="module-description">
+                                                        {{ lines[1].strip().replace('*', '').replace('#', '').replace('-', '').strip() }}
+                                                    </p>
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     {% endif %}
                                 {% endfor %}
@@ -66,7 +68,8 @@
                                             name="feedback" 
                                             class="form-control" 
                                             rows="3" 
-                                            placeholder="Your feedback helps us improve our recommendations (optional)"></textarea>
+                                            placeholder="Your feedback helps us improve our recommendations (optional)">
+                                        </textarea>
                                     </div>
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-paper-plane me-2"></i>

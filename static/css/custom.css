@@ -26,39 +26,57 @@ body {
     animation: fadeInUp 0.8s ease-out;
 }
 
-/* Module list styles */
-.recommendations-list {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem;
+/* Module card styles */
+.row.g-4 {
+    margin: -1rem;
 }
 
-.module-item {
-    padding: 2rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+.module-card {
+    height: 250px;
+    width: 250px;
+    background: linear-gradient(160deg, #1a1d21 0%, #2d3748 100%);
+    border: none;
+    border-radius: 15px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.module-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 20px rgba(138, 43, 226, 0.3);
+}
+
+.module-title {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: var(--bs-light);
     text-align: center;
 }
 
-.module-item:last-child {
-    border-bottom: none;
+.module-description {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--bs-gray-300);
+    text-align: center;
+    margin-bottom: 0;
 }
 
 .module-icon {
-    font-size: 2rem;
+    font-size: 2.5rem;
     color: var(--purple-accent);
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    transition: transform 0.3s ease;
 }
 
-.module-name {
-    font-size: 1.4rem;
-    color: var(--bs-light);
-    margin-bottom: 1rem;
-}
-
-.module-desc {
-    font-size: 1rem;
-    color: var(--bs-gray-300);
-    line-height: 1.5;
+.module-card:hover .module-icon {
+    transform: scale(1.1);
 }
 
 /* Loading spinner */
@@ -120,7 +138,6 @@ body {
     transform: scale(1.1);
 }
 
-/* Forms and inputs */
 .feedback-form textarea {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(138, 43, 226, 0.2);

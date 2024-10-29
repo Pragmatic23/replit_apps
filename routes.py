@@ -5,7 +5,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app import app, db
 from models import User, Recommendation, UserSession
 from utils import get_module_recommendations
-from sqlalchemy import func
+from sqlalchemy import func, distinct
 
 def admin_required(f):
     @wraps(f)
@@ -190,19 +190,15 @@ def admin_dashboard():
 def get_recommendations():
     requirements = request.form.get('requirements', '')
     industry = request.form.get('industry', '')
-    company_size = request.form.get('company_size', '')
-    budget = request.form.get('budget', '')
     features = request.form.getlist('features')
 
-    if not industry or not company_size or not budget:
+    if not industry:
         flash('Please fill in all required fields')
         return redirect(url_for('index'))
 
     recommendations = get_module_recommendations(
         requirements=requirements,
         industry=industry,
-        company_size=company_size,
-        budget=budget,
         features=features
     )
     
@@ -212,8 +208,6 @@ def get_recommendations():
         active_session = get_or_create_user_session()
         full_context = f"""
 Industry: {industry}
-Company Size: {company_size}
-Budget Level: {budget}
 Features: {', '.join(features) if features else 'None'}
 Additional Requirements: {requirements}
 

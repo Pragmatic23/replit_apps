@@ -92,6 +92,22 @@
                             </div>
                         </div>
 
+                        <!-- Odoo Version Selection -->
+                        <div class="mb-3">
+                            <label for="current_version" class="form-label">
+                                <i class="fas fa-code-branch me-2"></i>
+                                Current Odoo Version
+                            </label>
+                            <select class="form-select" id="current_version" name="current_version" required>
+                                <option value="">Select current version</option>
+                                <option value="17.0">Odoo 17.0 (Latest)</option>
+                                <option value="16.0">Odoo 16.0</option>
+                                <option value="15.0">Odoo 15.0</option>
+                                <option value="14.0">Odoo 14.0</option>
+                                <option value="none">Not currently using Odoo</option>
+                            </select>
+                        </div>
+
                         <!-- Specific Requirements -->
                         <div class="mb-3">
                             <label for="requirements" class="form-label">

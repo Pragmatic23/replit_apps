@@ -48,7 +48,6 @@ def get_recommendations():
     
     # Get existing additional fields
     company_size = request.form.get('company_size')
-    budget = request.form.get('budget')
     deployment = request.form.get('deployment')
     region = request.form.get('region')
     integrations = request.form.getlist('integrations')
@@ -60,7 +59,6 @@ Business Information:
 Industry: {industry}
 Company Size: {company_size}
 Customer Website: {customer_website}
-Budget Range: {budget}
 Geographic Region: {region}
 
 Odoo Experience and Preferences:

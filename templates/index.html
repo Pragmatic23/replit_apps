@@ -40,6 +40,26 @@
                             </select>
                         </div>
 
+                        <!-- Custom Requirements - Moved up and enhanced -->
+                        <div class="mb-4 p-3 bg-light border rounded">
+                            <label for="custom_requirements" class="form-label">
+                                <i class="fas fa-list-alt me-2"></i>
+                                Your Specific Requirements
+                            </label>
+                            <textarea class="form-control" 
+                                    id="custom_requirements" 
+                                    name="custom_requirements" 
+                                    rows="6"
+                                    placeholder="Please provide detailed information about:
+• Your current business processes and pain points
+• Specific features or functionality you need
+• Integration requirements with other systems
+• Any unique challenges or requirements specific to your industry
+• Scale and complexity of your operations"
+                                    ></textarea>
+                            <small class="text-muted">The more details you provide, the better we can tailor our module recommendations to your needs.</small>
+                        </div>
+
                         <!-- Customer Website -->
                         <div class="mb-3">
                             <label for="customer_website" class="form-label">
@@ -116,36 +136,6 @@
                                 <option value="201-500">201-500 employees</option>
                                 <option value="501+">501+ employees</option>
                             </select>
-                        </div>
-
-                        <!-- Budget Range -->
-                        <div class="mb-3">
-                            <label for="budget" class="form-label">
-                                <i class="fas fa-dollar-sign me-2"></i>
-                                Budget Range (Annual)
-                            </label>
-                            <select class="form-select" id="budget" name="budget" required>
-                                <option value="">Select budget range</option>
-                                <option value="0-1000">$0 - $1,000</option>
-                                <option value="1001-5000">$1,001 - $5,000</option>
-                                <option value="5001-10000">$5,001 - $10,000</option>
-                                <option value="10001-50000">$10,001 - $50,000</option>
-                                <option value="50001+">$50,001+</option>
-                            </select>
-                        </div>
-
-                        <!-- Custom Requirements -->
-                        <div class="mb-3">
-                            <label for="custom_requirements" class="form-label">
-                                <i class="fas fa-list-alt me-2"></i>
-                                Your Specific Requirements
-                            </label>
-                            <textarea class="form-control" 
-                                    id="custom_requirements" 
-                                    name="custom_requirements" 
-                                    rows="4"
-                                    placeholder="Please describe your specific business needs, challenges, or any particular requirements you have..."></textarea>
-                            <small class="text-muted">Share any specific requirements, challenges, or goals that will help us recommend the most suitable modules for your needs.</small>
                         </div>
 
                         <div class="text-center">

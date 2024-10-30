@@ -41,70 +41,30 @@
 
                         <!-- Module Modal -->
                         <div class="modal fade" id="moduleModal{{ loop.index }}" tabindex="-1">
-                            <div class="modal-dialog modal-lg">
+                            <div class="modal-dialog">
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title">{{ module.name }}</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <div class="row">
-                                            <div class="col-md-4">
-                                                {% if module.image %}
-                                                    <img src="{{ module.image }}" alt="{{ module.name }}" class="img-fluid mb-3">
-                                                {% endif %}
+                                        <p class="mb-3">{{ module.description }}</p>
+                                        
+                                        <h6 class="fw-bold mb-2">Key Features:</h6>
+                                        <ul class="mb-3">
+                                            {% for feature in module.key_features[:3] %}
+                                                <li>{{ feature }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        
+                                        {% if module.url %}
+                                            <div class="d-grid">
+                                                <a href="{{ module.url }}" target="_blank" class="btn btn-primary">
+                                                    <i class="fas fa-external-link-alt me-2"></i>
+                                                    View in Odoo Apps Store
+                                                </a>
                                             </div>
-                                            <div class="col-md-8">
-                                                <!-- Business Context Section -->
-                                                <div class="business-context mb-4">
-                                                    <h6 class="fw-bold mb-3">Business Context</h6>
-                                                    <div class="card bg-light">
-                                                        <div class="card-body">
-                                                            <p><strong>Industry:</strong> {{ request.form.get('industry') }}</p>
-                                                            <p><strong>Company Size:</strong> {{ request.form.get('company_size') }}</p>
-                                                            <p><strong>Region:</strong> {{ request.form.get('region') or 'Not specified' }}</p>
-                                                            <p><strong>Deployment Type:</strong> {{ request.form.get('deployment') or 'Not specified' }}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <!-- Odoo Experience Section -->
-                                                <div class="odoo-context mb-4">
-                                                    <h6 class="fw-bold mb-3">Odoo Setup</h6>
-                                                    <div class="card bg-light">
-                                                        <div class="card-body">
-                                                            <p><strong>Experience Level:</strong> {{ request.form.get('has_odoo_experience')|title }}</p>
-                                                            {% if request.form.get('has_odoo_experience') == 'yes' %}
-                                                                <p><strong>Current Version:</strong> {{ request.form.get('current_version') }}</p>
-                                                                <p><strong>Edition:</strong> {{ request.form.get('preferred_edition')|title }}</p>
-                                                            {% endif %}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <!-- Module Details Section -->
-                                                <div class="module-details mb-4">
-                                                    <h6 class="fw-bold mb-3">Module Details</h6>
-                                                    <p class="mb-4">{{ module.description }}</p>
-                                                    
-                                                    <!-- Integration Benefits -->
-                                                    {% if request.form.getlist('integrations') %}
-                                                        <h6 class="fw-bold mb-2">Integration Benefits</h6>
-                                                        <p class="mb-3">This module integrates with: {{ ', '.join(request.form.getlist('integrations')) }}</p>
-                                                    {% endif %}
-                                                </div>
-
-                                                <!-- Action Buttons -->
-                                                {% if module.url %}
-                                                    <div class="d-grid gap-2">
-                                                        <a href="{{ module.url }}" target="_blank" class="btn btn-primary">
-                                                            <i class="fas fa-external-link-alt me-2"></i>
-                                                            View in Odoo Apps Store
-                                                        </a>
-                                                    </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>

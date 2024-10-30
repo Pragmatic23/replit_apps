@@ -55,21 +55,53 @@
                                                 {% endif %}
                                             </div>
                                             <div class="col-md-8">
-                                                <h6 class="fw-bold mb-3">Your Requirements</h6>
-                                                <div class="requirements-context mb-4">
-                                                    <p><strong>Industry:</strong> {{ request.form.get('industry') }}</p>
-                                                    <p><strong>Company Size:</strong> {{ request.form.get('company_size') }}</p>
-                                                    <p><strong>Odoo Experience:</strong> {{ request.form.get('has_odoo_experience') }}</p>
+                                                <!-- Business Context Section -->
+                                                <div class="business-context mb-4">
+                                                    <h6 class="fw-bold mb-3">Business Context</h6>
+                                                    <div class="card bg-light">
+                                                        <div class="card-body">
+                                                            <p><strong>Industry:</strong> {{ request.form.get('industry') }}</p>
+                                                            <p><strong>Company Size:</strong> {{ request.form.get('company_size') }}</p>
+                                                            <p><strong>Region:</strong> {{ request.form.get('region') or 'Not specified' }}</p>
+                                                            <p><strong>Deployment Type:</strong> {{ request.form.get('deployment') or 'Not specified' }}</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                
-                                                <h6 class="fw-bold mb-3">Module Details</h6>
-                                                <p class="mb-4">{{ module.description }}</p>
-                                                
+
+                                                <!-- Odoo Experience Section -->
+                                                <div class="odoo-context mb-4">
+                                                    <h6 class="fw-bold mb-3">Odoo Setup</h6>
+                                                    <div class="card bg-light">
+                                                        <div class="card-body">
+                                                            <p><strong>Experience Level:</strong> {{ request.form.get('has_odoo_experience')|title }}</p>
+                                                            {% if request.form.get('has_odoo_experience') == 'yes' %}
+                                                                <p><strong>Current Version:</strong> {{ request.form.get('current_version') }}</p>
+                                                                <p><strong>Edition:</strong> {{ request.form.get('preferred_edition')|title }}</p>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Module Details Section -->
+                                                <div class="module-details mb-4">
+                                                    <h6 class="fw-bold mb-3">Module Details</h6>
+                                                    <p class="mb-4">{{ module.description }}</p>
+                                                    
+                                                    <!-- Integration Benefits -->
+                                                    {% if request.form.getlist('integrations') %}
+                                                        <h6 class="fw-bold mb-2">Integration Benefits</h6>
+                                                        <p class="mb-3">This module integrates with: {{ ', '.join(request.form.getlist('integrations')) }}</p>
+                                                    {% endif %}
+                                                </div>
+
+                                                <!-- Action Buttons -->
                                                 {% if module.url %}
-                                                    <a href="{{ module.url }}" target="_blank" class="btn btn-primary">
-                                                        <i class="fas fa-external-link-alt me-2"></i>
-                                                        View in Odoo Apps Store
-                                                    </a>
+                                                    <div class="d-grid gap-2">
+                                                        <a href="{{ module.url }}" target="_blank" class="btn btn-primary">
+                                                            <i class="fas fa-external-link-alt me-2"></i>
+                                                            View in Odoo Apps Store
+                                                        </a>
+                                                    </div>
                                                 {% endif %}
                                             </div>
                                         </div>

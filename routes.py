@@ -15,6 +15,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import qrcode
 from PIL import Image as PILImage
 from werkzeug.utils import secure_filename
+import tempfile
+import io
 
 UPLOAD_FOLDER = 'static/uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -35,26 +37,27 @@ def index():
 @app.route('/get_recommendations', methods=['POST'])
 @login_required
 def get_recommendations():
-    # Get all form fields
-    industry = request.form.get('industry')
-    features = request.form.getlist('features')
-    requirements = request.form.get('requirements', '')
-    
-    # Get new fields
-    customer_website = request.form.get('customer_website', '')
-    has_odoo_experience = request.form.get('has_odoo_experience')
-    preferred_edition = request.form.get('preferred_edition')
-    current_version = request.form.get('current_version')
-    
-    # Get existing additional fields
-    company_size = request.form.get('company_size')
-    deployment = request.form.get('deployment')
-    region = request.form.get('region')
-    integrations = request.form.getlist('integrations')
-    languages = request.form.getlist('languages')
-    
-    # Create a detailed requirements string
-    detailed_requirements = f"""
+    try:
+        # Get all form fields
+        industry = request.form.get('industry')
+        features = request.form.getlist('features')
+        requirements = request.form.get('requirements', '')
+        
+        # Get new fields
+        customer_website = request.form.get('customer_website', '')
+        has_odoo_experience = request.form.get('has_odoo_experience')
+        preferred_edition = request.form.get('preferred_edition')
+        current_version = request.form.get('current_version')
+        
+        # Get existing additional fields
+        company_size = request.form.get('company_size')
+        deployment = request.form.get('deployment')
+        region = request.form.get('region')
+        integrations = request.form.getlist('integrations')
+        languages = request.form.getlist('languages')
+        
+        # Create a detailed requirements string
+        detailed_requirements = f"""
 Business Information:
 Industry: {industry}
 Company Size: {company_size}
@@ -75,18 +78,21 @@ Language Requirements: {', '.join(languages) if languages else 'English only'}
 Additional Requirements:
 {requirements}
 """
-    
-    # Get recommendations with updated context
-    recommendations = get_module_recommendations(
-        requirements=detailed_requirements,
-        industry=industry,
-        features=features,
-        preferred_edition=preferred_edition,
-        has_experience=has_odoo_experience
-    )
-    
-    # Create recommendation record if successful
-    if not recommendations.get('error'):
+        
+        # Get recommendations with updated context
+        recommendations = get_module_recommendations(
+            requirements=detailed_requirements,
+            industry=industry,
+            features=features,
+            preferred_edition=preferred_edition,
+            has_experience=has_odoo_experience
+        )
+        
+        if 'error' in recommendations:
+            flash(recommendations['error'], 'error')
+            return redirect(url_for('index'))
+            
+        # Create recommendation record if successful
         recommendation = Recommendation(
             requirements=detailed_requirements,
             recommendations=recommendations['text'],
@@ -98,10 +104,57 @@ Additional Requirements:
         db.session.commit()
         
         return render_template('recommendations.html', 
-                             recommendations=recommendations,
-                             recommendation_id=recommendation.id)
+                            recommendations=recommendations,
+                            recommendation_id=recommendation.id)
     
-    return render_template('recommendations.html', recommendations=recommendations)
+    except Exception as e:
+        flash(f"An error occurred: {str(e)}", 'error')
+        return redirect(url_for('index'))
+
+@app.route('/export_recommendations/<int:recommendation_id>')
+@login_required
+def export_recommendations(recommendation_id):
+    try:
+        recommendation = Recommendation.query.get_or_404(recommendation_id)
+        
+        # Create a temporary file for the PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            # Create PDF document
+            doc = SimpleDocTemplate(tmp_file.name, pagesize=letter)
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Title
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Title'],
+                fontSize=24,
+                spaceAfter=30
+            )
+            story.append(Paragraph("Odoo Module Recommendations", title_style))
+            story.append(Spacer(1, 20))
+            
+            # Requirements section
+            story.append(Paragraph("Business Requirements", styles['Heading1']))
+            story.append(Paragraph(recommendation.requirements, styles['Normal']))
+            story.append(Spacer(1, 20))
+            
+            # Recommendations section
+            story.append(Paragraph("Recommended Modules", styles['Heading1']))
+            story.append(Paragraph(recommendation.recommendations, styles['Normal']))
+            
+            # Build PDF
+            doc.build(story)
+            
+            return send_file(
+                tmp_file.name,
+                as_attachment=True,
+                download_name=f'odoo_recommendations_{recommendation_id}.pdf',
+                mimetype='application/pdf'
+            )
+    except Exception as e:
+        flash(f"Error generating PDF: {str(e)}", 'error')
+        return redirect(url_for('index'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

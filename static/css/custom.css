@@ -29,7 +29,7 @@ header h1 {
     border-radius: 0.5rem;
     overflow: hidden;
     box-shadow: var(--card-shadow);
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease;
     height: 100%;
     border: none;
 }
@@ -77,72 +77,11 @@ header h1 {
     margin-bottom: 1rem;
 }
 
-/* Loading spinner */
-.loading-spinner {
-    display: none;
-    text-align: center;
-    padding: 3rem 0;
-}
-
-.loading-spinner.active {
-    display: block;
-}
-
-.loading-spinner .spinner-border {
-    width: 3rem;
-    height: 3rem;
-}
-
-/* Modal styles */
-.modal-content {
-    border-radius: 0.5rem;
-}
-
-.modal-header {
-    border-bottom: 1px solid var(--bs-gray-200);
-}
-
-.modal-title {
-    font-weight: 600;
-}
-
-/* Feedback form styles */
-.feedback-form {
-    background: var(--bs-white);
-    border-radius: 0.5rem;
-    padding: 2rem;
-    box-shadow: var(--card-shadow);
-}
-
-.rating {
-    display: inline-flex;
-    flex-direction: row-reverse;
-    gap: 0.5rem;
-}
-
-.rating input {
-    display: none;
-}
-
-.rating label {
-    cursor: pointer;
-    font-size: 1.5rem;
-    color: var(--bs-gray-400);
-    transition: color 0.2s ease;
-}
-
-.rating label:hover,
-.rating label:hover ~ label,
-.rating input:checked ~ label {
-    color: var(--bs-warning);
-}
-
 /* Button styles */
 .btn {
     padding: 0.5rem 1rem;
     font-weight: 500;
     border-radius: 0.375rem;
-    transition: all 0.2s ease;
 }
 
 .btn-primary {
@@ -152,7 +91,6 @@ header h1 {
 
 .btn-primary:hover {
     background-color: var(--bs-primary-dark);
-    transform: translateY(-1px);
 }
 
 .btn-outline-primary {

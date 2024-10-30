@@ -4,6 +4,11 @@ from typing import List, Optional, Dict, Tuple
 import requests
 from bs4 import BeautifulSoup
 import json
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -32,9 +37,10 @@ def get_module_info(module_name: str) -> Tuple[str, str]:
                     module_url = base_url + module_link['href']
                     img_tag = first_result.find('img')
                     image_url = img_tag['src'] if img_tag else ""
+                    logger.info(f"Found module info for {module_name}: URL={module_url}")
                     return module_url, image_url
     except Exception as e:
-        print(f"Error fetching module info: {str(e)}")
+        logger.error(f"Error fetching module info for {module_name}: {str(e)}")
     
     return "", ""
 
@@ -43,7 +49,14 @@ def get_module_recommendations(requirements: str = "",
                              features: Optional[List[str]] = None,
                              preferred_edition: str = "community",
                              has_experience: str = "no") -> Dict:
+    """
+    Get module recommendations using OpenAI API
+    """
     try:
+        if not OPENAI_API_KEY:
+            logger.error("OpenAI API key is not configured")
+            return {"error": "OpenAI API key is not configured"}
+
         # Create a detailed context from the filters
         context_parts = []
         if industry:
@@ -59,6 +72,8 @@ def get_module_recommendations(requirements: str = "",
             context_parts.append(f"Additional Requirements: {requirements}")
 
         context = "\n".join(context_parts)
+        logger.info("Generated context for recommendation request")
+        logger.debug(f"Context: {context}")
 
         prompt = f'''As an Odoo technical consultant with extensive experience, recommend 4 official Odoo modules that best address the following business requirements.
 
@@ -84,9 +99,7 @@ Present each recommendation in a clear, structured format:
 Module Name
 [Concise description focused on business value]'''
 
-        if not OPENAI_API_KEY:
-            return {"error": "OpenAI API key is not configured"}
-
+        logger.info("Making OpenAI API request")
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -95,9 +108,12 @@ Module Name
         )
 
         if not response.choices[0].message.content:
+            logger.error("No recommendations generated from OpenAI")
             return {"error": "No recommendations generated"}
 
         recommendations = response.choices[0].message.content
+        logger.debug(f"Raw OpenAI response: {recommendations}")
+
         modules = []
         urls = {}
         images = {}
@@ -118,6 +134,7 @@ Module Name
                         'image': image
                     })
 
+        logger.info(f"Successfully generated {len(modules)} module recommendations")
         return {
             'text': recommendations,
             'modules': modules,
@@ -126,4 +143,5 @@ Module Name
         }
 
     except Exception as e:
+        logger.error(f"Error generating recommendations: {str(e)}")
         return {"error": f"Unable to generate recommendations. Please try again later. Details: {str(e)}"}

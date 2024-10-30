@@ -40,14 +40,20 @@
                             </select>
                         </div>
 
-                        <!-- Customer Website -->
+                        <!-- Company Size -->
                         <div class="mb-3">
-                            <label for="customer_website" class="form-label">
-                                <i class="fas fa-globe me-2"></i>
-                                Customer Website
+                            <label for="company_size" class="form-label">
+                                <i class="fas fa-users me-2"></i>
+                                Company Size
                             </label>
-                            <input type="url" class="form-control" id="customer_website" name="customer_website" 
-                                   placeholder="https://example.com">
+                            <select class="form-select" id="company_size" name="company_size" required>
+                                <option value="">Select company size</option>
+                                <option value="1-10">1-10 employees</option>
+                                <option value="11-50">11-50 employees</option>
+                                <option value="51-200">51-200 employees</option>
+                                <option value="201-500">201-500 employees</option>
+                                <option value="501+">501+ employees</option>
+                            </select>
                         </div>
 
                         <!-- Previous Odoo Experience -->
@@ -86,47 +92,15 @@
                             </div>
                         </div>
 
-                        <!-- Current Odoo Version -->
-                        <div class="mb-3">
-                            <label for="current_version" class="form-label">
-                                <i class="fas fa-code-branch me-2"></i>
-                                Current Odoo Version (if any)
-                            </label>
-                            <select class="form-select" id="current_version" name="current_version">
-                                <option value="">Not currently using Odoo</option>
-                                <option value="17.0">Odoo 17.0</option>
-                                <option value="16.0">Odoo 16.0</option>
-                                <option value="15.0">Odoo 15.0</option>
-                                <option value="14.0">Odoo 14.0</option>
-                                <option value="older">Older version</option>
-                            </select>
-                        </div>
-
-                        <!-- Company Size -->
-                        <div class="mb-3">
-                            <label for="company_size" class="form-label">
-                                <i class="fas fa-users me-2"></i>
-                                Company Size
-                            </label>
-                            <select class="form-select" id="company_size" name="company_size" required>
-                                <option value="">Select company size</option>
-                                <option value="1-10">1-10 employees</option>
-                                <option value="11-50">11-50 employees</option>
-                                <option value="51-200">51-200 employees</option>
-                                <option value="201-500">201-500 employees</option>
-                                <option value="501+">501+ employees</option>
-                            </select>
-                        </div>
-
                         <!-- Specific Requirements -->
                         <div class="mb-3">
-                            <label for="custom_requirements" class="form-label">
+                            <label for="requirements" class="form-label">
                                 <i class="fas fa-list-alt me-2"></i>
                                 Specific Requirements
                             </label>
                             <textarea class="form-control" 
-                                    id="custom_requirements" 
-                                    name="custom_requirements" 
+                                    id="requirements" 
+                                    name="requirements" 
                                     rows="6"
                                     placeholder="Please describe your specific business needs, challenges, or any particular requirements you have..."></textarea>
                         </div>

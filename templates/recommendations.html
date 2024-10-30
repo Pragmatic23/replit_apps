@@ -41,30 +41,38 @@
 
                         <!-- Module Modal -->
                         <div class="modal fade" id="moduleModal{{ loop.index }}" tabindex="-1">
-                            <div class="modal-dialog">
+                            <div class="modal-dialog modal-lg">
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title">{{ module.name }}</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <p class="mb-3">{{ module.description }}</p>
-                                        
-                                        <h6 class="fw-bold mb-2">Key Features:</h6>
-                                        <ul class="mb-3">
-                                            {% for feature in module.key_features[:3] %}
-                                                <li>{{ feature }}</li>
-                                            {% endfor %}
-                                        </ul>
-                                        
-                                        {% if module.url %}
-                                            <div class="d-grid">
-                                                <a href="{{ module.url }}" target="_blank" class="btn btn-primary">
-                                                    <i class="fas fa-external-link-alt me-2"></i>
-                                                    View in Odoo Apps Store
-                                                </a>
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                {% if module.image %}
+                                                    <img src="{{ module.image }}" alt="{{ module.name }}" class="img-fluid mb-3">
+                                                {% endif %}
                                             </div>
-                                        {% endif %}
+                                            <div class="col-md-8">
+                                                <h6 class="fw-bold mb-3">Your Requirements</h6>
+                                                <div class="requirements-context mb-4">
+                                                    <p><strong>Industry:</strong> {{ request.form.get('industry') }}</p>
+                                                    <p><strong>Company Size:</strong> {{ request.form.get('company_size') }}</p>
+                                                    <p><strong>Odoo Experience:</strong> {{ request.form.get('has_odoo_experience') }}</p>
+                                                </div>
+                                                
+                                                <h6 class="fw-bold mb-3">Module Details</h6>
+                                                <p class="mb-4">{{ module.description }}</p>
+                                                
+                                                {% if module.url %}
+                                                    <a href="{{ module.url }}" target="_blank" class="btn btn-primary">
+                                                        <i class="fas fa-external-link-alt me-2"></i>
+                                                        View in Odoo Apps Store
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

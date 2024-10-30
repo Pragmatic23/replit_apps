@@ -2,6 +2,7 @@ from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
+from sqlalchemy.dialects.postgresql import JSON
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,8 +30,8 @@ class Recommendation(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     rating = db.Column(db.Integer)
     feedback = db.Column(db.Text)
-    module_urls = db.Column(db.JSON)  # Store module URLs as JSON
-    module_images = db.Column(db.JSON)  # Store module image URLs as JSON
+    module_urls = db.Column(JSON)  # Store module URLs as JSON
+    module_images = db.Column(JSON)  # Store module image URLs as JSON
     ease_of_use_rating = db.Column(db.Integer)
     features_rating = db.Column(db.Integer)
     integration_rating = db.Column(db.Integer)

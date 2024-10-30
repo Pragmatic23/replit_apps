@@ -6,7 +6,7 @@ def recreate_database():
         # Drop all tables
         db.drop_all()
         
-        # Create all tables
+        # Create all tables with updated schema
         db.create_all()
         
         print("Database tables recreated successfully!")

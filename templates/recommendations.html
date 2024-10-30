@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
+<div class="min-h-screen bg-gradient">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="container py-4">
+            <h1 class="text-3xl fw-bold">Recommended Modules</h1>
+        </div>
+    </header>
+
     <!-- Loading Spinner -->
     <div class="loading-spinner" id="loadingSpinner">
         <div class="spinner-border" role="status">
@@ -11,152 +18,113 @@
     </div>
 
     <!-- Recommendations Section -->
-    <div class="row justify-content-center">
-        <div class="col-md-10">
-            <div class="card">
-                <div class="card-body">
-                    <h2 class="card-title text-center mb-4">
-                        <i class="fas fa-cube me-2"></i>
-                        Recommended Modules
-                    </h2>
-
-                    {% if recommendations.error %}
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            {{ recommendations.error }}
+    <main class="container py-4">
+        {% if recommendations.error %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                {{ recommendations.error }}
+            </div>
+        {% else %}
+            <div class="row g-4">
+                {% for module in recommendations.modules %}
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <div class="module-card">
+                            {% if module.image %}
+                                <img src="{{ module.image }}" alt="{{ module.name }}" class="module-image">
+                            {% else %}
+                                <div class="module-image-placeholder">
+                                    <i class="fas fa-cube"></i>
+                                </div>
+                            {% endif %}
+                            <div class="card-body">
+                                <h3 class="module-title">{{ module.name }}</h3>
+                                <p class="module-description">{{ module.description }}</p>
+                                <button type="button" class="btn btn-outline-primary btn-sm mt-3" 
+                                        data-bs-toggle="modal" data-bs-target="#moduleModal{{ loop.index }}">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Learn More
+                                </button>
+                            </div>
                         </div>
-                    {% else %}
-                        <div class="row g-4">
-                            {% for module in recommendations.modules %}
-                                <div class="col-md-6">
-                                    <div class="module-card h-100">
+
+                        <!-- Module Modal -->
+                        <div class="modal fade" id="moduleModal{{ loop.index }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">{{ module.name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
                                         {% if module.image %}
-                                            <img src="{{ module.image }}" alt="{{ module.name }}" class="module-image mb-3">
-                                        {% else %}
-                                            <i class="fas fa-cube module-icon"></i>
+                                            <img src="{{ module.image }}" alt="{{ module.name }}" class="img-fluid mb-3">
                                         {% endif %}
-                                        <h3 class="module-title">
-                                            {% if module.url %}
-                                                <a href="{{ module.url }}" target="_blank" class="text-decoration-none">
-                                                    {{ module.name }}
-                                                    <i class="fas fa-external-link-alt ms-2"></i>
-                                                </a>
-                                            {% else %}
-                                                {{ module.name }}
-                                            {% endif %}
-                                        </h3>
-                                        <p class="module-description">
-                                            {{ module.description }}
-                                        </p>
+                                        <h6 class="fw-bold">Description</h6>
+                                        <p>{{ module.description }}</p>
+                                        {% if module.url %}
+                                            <a href="{{ module.url }}" target="_blank" class="btn btn-primary mt-3">
+                                                <i class="fas fa-external-link-alt me-2"></i>
+                                                View in Odoo Apps Store
+                                            </a>
+                                        {% endif %}
                                     </div>
                                 </div>
-                            {% endfor %}
-                        </div>
-                        
-                        {% if current_user.is_authenticated and recommendation_id %}
-                            <div class="feedback-form">
-                                <h4 class="text-center mb-3">How helpful was this recommendation?</h4>
-                                <form method="POST" action="/submit_feedback" class="text-center" enctype="multipart/form-data">
-                                    <input type="hidden" name="recommendation_id" value="{{ recommendation_id }}">
-                                    
-                                    <!-- Overall Rating -->
-                                    <div class="mb-4">
-                                        <label class="form-label">Overall Rating</label>
-                                        <div class="rating">
-                                            {% for i in range(5, 0, -1) %}
-                                                <input type="radio" name="overall_rating" id="star{{ i }}" value="{{ i }}" required>
-                                                <label for="star{{ i }}">
-                                                    <i class="fas fa-star"></i>
-                                                </label>
-                                            {% endfor %}
-                                        </div>
-                                    </div>
-
-                                    <!-- Detailed Ratings -->
-                                    <div class="row mb-4">
-                                        <div class="col-md-4">
-                                            <label class="form-label">Ease of Use</label>
-                                            <select name="ease_of_use" class="form-select">
-                                                <option value="">Select rating</option>
-                                                {% for i in range(1, 6) %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label">Features</label>
-                                            <select name="features_rating" class="form-select">
-                                                <option value="">Select rating</option>
-                                                {% for i in range(1, 6) %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label">Integration</label>
-                                            <select name="integration_rating" class="form-select">
-                                                <option value="">Select rating</option>
-                                                {% for i in range(1, 6) %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <!-- Feedback Category -->
-                                    <div class="mb-4">
-                                        <label class="form-label">Feedback Category</label>
-                                        <select name="feedback_category" class="form-select">
-                                            <option value="">Select category</option>
-                                            <option value="accuracy">Recommendation Accuracy</option>
-                                            <option value="usefulness">Usefulness</option>
-                                            <option value="clarity">Clarity</option>
-                                            <option value="technical">Technical Issues</option>
-                                            <option value="other">Other</option>
-                                        </select>
-                                    </div>
-
-                                    <!-- Detailed Feedback -->
-                                    <div class="mb-4">
-                                        <label class="form-label">Detailed Feedback</label>
-                                        <textarea 
-                                            name="feedback" 
-                                            class="form-control" 
-                                            rows="3" 
-                                            placeholder="Your feedback helps us improve our recommendations">
-                                        </textarea>
-                                    </div>
-
-                                    <!-- Screenshot Upload -->
-                                    <div class="mb-4">
-                                        <label class="form-label">Upload Screenshot (optional)</label>
-                                        <input type="file" name="screenshot" class="form-control" accept="image/*">
-                                    </div>
-
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-paper-plane me-2"></i>
-                                        Submit Feedback
-                                    </button>
-                                </form>
                             </div>
-                        {% endif %}
-                    {% endif %}
-                    
-                    <div class="mt-4 text-center">
-                        {% if recommendation_id %}
-                            <a href="{{ url_for('export_recommendations', recommendation_id=recommendation_id) }}" class="btn btn-secondary me-2">
-                                <i class="fas fa-file-pdf me-2"></i>
-                                Export as PDF
-                            </a>
-                        {% endif %}
-                        <a href="/" class="btn btn-primary">
-                            <i class="fas fa-redo me-2"></i>
-                            Try Another Search
-                        </a>
+                        </div>
                     </div>
-                </div>
+                {% endfor %}
             </div>
+
+            {% if current_user.is_authenticated and recommendation_id %}
+                <!-- Feedback Form -->
+                <div class="feedback-form mt-5">
+                    <h4 class="text-center mb-3">How helpful was this recommendation?</h4>
+                    <form method="POST" action="/submit_feedback" class="text-center" enctype="multipart/form-data">
+                        <input type="hidden" name="recommendation_id" value="{{ recommendation_id }}">
+                        
+                        <!-- Rating Section -->
+                        <div class="mb-4">
+                            <label class="form-label">Overall Rating</label>
+                            <div class="rating">
+                                {% for i in range(5, 0, -1) %}
+                                    <input type="radio" name="overall_rating" id="star{{ i }}" value="{{ i }}" required>
+                                    <label for="star{{ i }}">
+                                        <i class="fas fa-star"></i>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Detailed Feedback -->
+                        <div class="mb-4">
+                            <label class="form-label">Your Feedback</label>
+                            <textarea name="feedback" class="form-control" rows="3" 
+                                    placeholder="Share your thoughts about these recommendations..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-2"></i>
+                            Submit Feedback
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="text-center mt-4">
+            {% if recommendation_id %}
+                <a href="{{ url_for('export_recommendations', recommendation_id=recommendation_id) }}" 
+                   class="btn btn-secondary me-2">
+                    <i class="fas fa-file-pdf me-2"></i>
+                    Export as PDF
+                </a>
+            {% endif %}
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-redo me-2"></i>
+                Try Another Search
+            </a>
         </div>
-    </div>
+    </main>
 </div>
 {% endblock %}

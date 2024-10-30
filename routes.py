@@ -20,6 +20,18 @@ UPLOAD_FOLDER = 'static/uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 @app.route('/get_recommendations', methods=['POST'])
 @login_required
 def get_recommendations():
@@ -93,4 +105,73 @@ Additional Requirements:
     
     return render_template('recommendations.html', recommendations=recommendations)
 
-# Keep other routes unchanged
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        user = User.query.filter_by(email=email).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid email or password')
+            
+    return render_template('login.html')
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if password != confirm_password:
+            flash('Passwords do not match')
+            return redirect(url_for('signup'))
+            
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered')
+            return redirect(url_for('signup'))
+            
+        user = User(username=username, email=email)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        
+        login_user(user)
+        return redirect(url_for('index'))
+        
+    return render_template('signup.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/admin/dashboard')
+@login_required
+@admin_required
+def admin_dashboard():
+    stats = {
+        'total_users': User.query.count(),
+        'total_recommendations': Recommendation.query.count(),
+        'average_rating': db.session.query(func.avg(Recommendation.rating)).scalar() or 0.0,
+        'active_sessions': UserSession.query.filter_by(session_end=None).count(),
+        'daily_users': [],
+        'daily_ratings': []
+    }
+    
+    users = User.query.order_by(User.created_at.desc()).limit(10).all()
+    recommendations = Recommendation.query.order_by(Recommendation.created_at.desc()).limit(10).all()
+    
+    return render_template('admin/dashboard.html', stats=stats, users=users, recommendations=recommendations)

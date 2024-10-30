@@ -1,0 +1,143 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Info } from 'lucide-react'
+
+// Mock data for Odoo apps
+const odooApps = [
+  { 
+    id: 1, 
+    name: "CRM", 
+    description: "Boost your sales with our powerful CRM", 
+    imageUrl: "https://www.odoo.com/web/image/website.s_banner_default_image/crm.png",
+    specifications: [
+      "Lead and opportunity management",
+      "Sales pipeline visualization",
+      "Customer communication tracking",
+      "Integration with email and calendar",
+      "Customizable dashboards and reports"
+    ]
+  },
+  { 
+    id: 2, 
+    name: "Inventory", 
+    description: "Efficiently manage your stock and inventory", 
+    imageUrl: "https://www.odoo.com/web/image/website.s_banner_default_image/inventory.png",
+    specifications: [
+      "Real-time inventory tracking",
+      "Automated reordering",
+      "Barcode scanning support",
+      "Multi-warehouse management",
+      "Integration with e-commerce platforms"
+    ]
+  },
+  { 
+    id: 3, 
+    name: "Accounting", 
+    description: "Streamline your financial operations", 
+    imageUrl: "https://www.odoo.com/web/image/website.s_banner_default_image/accounting.png",
+    specifications: [
+      "General ledger and journal entries",
+      "Accounts payable and receivable",
+      "Bank reconciliation",
+      "Financial reporting and analysis",
+      "Multi-currency support"
+    ]
+  },
+  { 
+    id: 4, 
+    name: "eCommerce", 
+    description: "Create and manage your online store with ease", 
+    imageUrl: "https://www.odoo.com/web/image/website.s_banner_default_image/ecommerce.png",
+    specifications: [
+      "Customizable product catalog",
+      "Secure payment gateway integration",
+      "Order management and tracking",
+      "Customer account management",
+      "SEO optimization tools"
+    ]
+  },
+  { 
+    id: 5, 
+    name: "Human Resources", 
+    description: "Simplify your HR processes and employee management", 
+    imageUrl: "https://www.odoo.com/web/image/website.s_banner_default_image/hr.png",
+    specifications: [
+      "Employee database management",
+      "Leave and absence tracking",
+      "Performance evaluation tools",
+      "Recruitment and onboarding processes",
+      "Payroll integration"
+    ]
+  },
+  { 
+    id: 6, 
+    name: "Project", 
+    description: "Efficiently plan, track, and manage your projects", 
+    imageUrl: "https://www.odoo.com/web/image/website.s_banner_default_image/project.png",
+    specifications: [
+      "Task and subtask management",
+      "Gantt chart for project timeline",
+      "Time tracking and billing",
+      "Team collaboration tools",
+      "Project budgeting and cost control"
+    ]
+  },
+]
+
+export default function RecommendationPage() {
+  const [recommendedApps, setRecommendedApps] = useState(odooApps)
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-bold text-gray-900">Recommended Odoo Apps</h1>
+        </div>
+      </header>
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recommendedApps.map((app) => (
+              <Card key={app.id} className="flex flex-col overflow-hidden">
+                <img src={app.imageUrl} alt={app.name} className="h-48 w-full object-cover" />
+                <CardHeader>
+                  <CardTitle>{app.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <p className="text-sm text-gray-600">{app.description}</p>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="mt-4">
+                        <Info className="mr-2 h-4 w-4" />
+                        Learn More
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>{app.name}</DialogTitle>
+                        <DialogDescription>
+                          Key features and specifications
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="mt-4">
+                        <ul className="list-disc pl-5 space-y-2">
+                          {app.specifications.map((spec, index) => (
+                            <li key={index} className="text-sm text-gray-700">{spec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}

@@ -29,14 +29,8 @@ header h1 {
     border-radius: 0.5rem;
     overflow: hidden;
     box-shadow: var(--card-shadow);
-    transition: transform 0.3s ease;
     height: 100%;
     border: none;
-}
-
-.module-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--card-hover-shadow);
 }
 
 .module-image {
@@ -90,7 +84,7 @@ header h1 {
 }
 
 .btn-primary:hover {
-    background-color: var(--bs-primary-dark);
+    background-color: var(--bs-primary);
 }
 
 .btn-outline-primary {

@@ -111,36 +111,6 @@ Additional Requirements:
         flash(f"An error occurred: {str(e)}", 'error')
         return redirect(url_for('index'))
 
-@app.route('/submit_feedback', methods=['POST'])
-@login_required
-def submit_feedback():
-    try:
-        recommendation_id = request.form.get('recommendation_id')
-        overall_rating = request.form.get('overall_rating')
-        feedback_text = request.form.get('feedback')
-
-        if not recommendation_id:
-            flash('Missing recommendation ID', 'error')
-            return redirect(url_for('index'))
-
-        recommendation = Recommendation.query.get_or_404(recommendation_id)
-
-        # Verify the recommendation belongs to the current user
-        if recommendation.user_id != current_user.id:
-            abort(403)
-
-        # Update the recommendation with feedback
-        recommendation.rating = int(overall_rating) if overall_rating else None
-        recommendation.feedback = feedback_text
-        db.session.commit()
-
-        flash('Thank you for your feedback!', 'success')
-        return redirect(url_for('dashboard'))
-
-    except Exception as e:
-        flash(f'Error submitting feedback: {str(e)}', 'error')
-        return redirect(url_for('index'))
-
 @app.route('/export_recommendations/<int:recommendation_id>')
 @login_required
 def export_recommendations(recommendation_id):
@@ -246,7 +216,6 @@ def admin_dashboard():
     stats = {
         'total_users': User.query.count(),
         'total_recommendations': Recommendation.query.count(),
-        'average_rating': db.session.query(func.avg(Recommendation.rating)).scalar() or 0.0,
         'active_sessions': UserSession.query.filter_by(session_end=None).count(),
         'daily_users': [],
         'daily_ratings': []

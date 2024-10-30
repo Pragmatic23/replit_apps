@@ -80,41 +80,6 @@
                     </div>
                 {% endfor %}
             </div>
-
-            {% if current_user.is_authenticated and recommendation_id %}
-                <!-- Feedback Form -->
-                <div class="feedback-form mt-5">
-                    <h4 class="text-center mb-3">How helpful was this recommendation?</h4>
-                    <form method="POST" action="/submit_feedback" class="text-center" enctype="multipart/form-data">
-                        <input type="hidden" name="recommendation_id" value="{{ recommendation_id }}">
-                        
-                        <!-- Rating Section -->
-                        <div class="mb-4">
-                            <label class="form-label">Overall Rating</label>
-                            <div class="rating">
-                                {% for i in range(5, 0, -1) %}
-                                    <input type="radio" name="overall_rating" id="star{{ i }}" value="{{ i }}" required>
-                                    <label for="star{{ i }}">
-                                        <i class="fas fa-star"></i>
-                                    </label>
-                                {% endfor %}
-                            </div>
-                        </div>
-
-                        <!-- Detailed Feedback -->
-                        <div class="mb-4">
-                            <label class="form-label">Your Feedback</label>
-                            <textarea name="feedback" class="form-control" rows="3" 
-                                    placeholder="Share your thoughts about these recommendations..."></textarea>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane me-2"></i>
-                            Submit Feedback
-                        </button>
-                    </form>
-                </div>
-            {% endif %}
         {% endif %}
 
         <!-- Action Buttons -->

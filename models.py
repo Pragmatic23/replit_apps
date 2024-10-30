@@ -28,15 +28,8 @@ class Recommendation(db.Model):
     requirements = db.Column(db.Text, nullable=False)
     recommendations = db.Column(db.Text, nullable=False)  
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    rating = db.Column(db.Integer)
-    feedback = db.Column(db.Text)
     module_urls = db.Column(JSON)  # Store module URLs as JSON
     module_images = db.Column(JSON)  # Store module image URLs as JSON
-    ease_of_use_rating = db.Column(db.Integer)
-    features_rating = db.Column(db.Integer)
-    integration_rating = db.Column(db.Integer)
-    feedback_category = db.Column(db.String(50))
-    screenshot_url = db.Column(db.String(255))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     user = db.relationship('User', backref=db.backref('recommendations', lazy=True))
     session_id = db.Column(db.Integer, db.ForeignKey('user_session.id'))

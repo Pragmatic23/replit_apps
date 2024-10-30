@@ -65,7 +65,8 @@ def get_module_recommendations(requirements: str = "",
             context_parts.append(f"Required Features: {format_features(features)}")
         
         # Add edition preference and experience level to context
-        context_parts.append(f"Preferred Edition: {preferred_edition.title()}")
+        if preferred_edition:
+            context_parts.append(f"Preferred Edition: {preferred_edition.title()}")
         context_parts.append(f"Previous Odoo Experience: {'Yes' if has_experience == 'yes' else 'No'}")
         
         if requirements:
@@ -106,42 +107,67 @@ Module Name
             temperature=0.3,
             max_tokens=1000
         )
-
-        if not response.choices[0].message.content:
-            logger.error("No recommendations generated from OpenAI")
+        
+        if not response or not hasattr(response.choices[0].message, 'content'):
+            logger.error("Invalid or empty response from OpenAI API")
+            return {"error": "Failed to generate recommendations"}
+            
+        content = response.choices[0].message.content
+        if not content:
+            logger.error("Empty content in OpenAI API response")
             return {"error": "No recommendations generated"}
-
-        recommendations = response.choices[0].message.content
-        logger.debug(f"Raw OpenAI response: {recommendations}")
-
+            
+        # Process recommendations with error handling
         modules = []
         urls = {}
         images = {}
-
-        for module in recommendations.split('\n\n'):
-            if module.strip():
-                lines = module.strip().split('\n')
-                if lines:
-                    module_name = lines[0].strip().replace('*', '').replace('#', '').replace('-', '').strip()
-                    url, image = get_module_info(module_name)
-                    if url:
-                        urls[module_name] = url
-                        images[module_name] = image
-                    modules.append({
-                        'name': module_name,
-                        'description': lines[1].strip() if len(lines) > 1 else '',
-                        'url': url,
-                        'image': image
-                    })
-
-        logger.info(f"Successfully generated {len(modules)} module recommendations")
+        
+        try:
+            module_sections = content.strip().split('\n\n')
+            for section in module_sections:
+                if not section.strip():
+                    continue
+                    
+                lines = section.strip().split('\n')
+                if not lines:
+                    continue
+                    
+                module_name = lines[0].strip()
+                if not module_name:
+                    continue
+                    
+                # Clean module name
+                module_name = module_name.replace('*', '').replace('#', '').replace('-', '').strip()
+                description = lines[1].strip() if len(lines) > 1 else 'No description available'
+                
+                url, image = get_module_info(module_name)
+                
+                modules.append({
+                    'name': module_name,
+                    'description': description,
+                    'url': url or '',
+                    'image': image or ''
+                })
+                
+                if url:
+                    urls[module_name] = url
+                    images[module_name] = image
+                    
+            if not modules:
+                logger.error("No valid modules parsed from response")
+                return {"error": "No valid recommendations found"}
+                
+        except Exception as e:
+            logger.error(f"Error parsing recommendations: {str(e)}")
+            return {"error": "Error processing recommendations"}
+            
         return {
-            'text': recommendations,
+            'text': content,
             'modules': modules,
             'urls': urls,
             'images': images
         }
-
+        
     except Exception as e:
         logger.error(f"Error generating recommendations: {str(e)}")
-        return {"error": f"Unable to generate recommendations. Please try again later. Details: {str(e)}"}
+        return {"error": f"Unable to generate recommendations: {str(e)}"}

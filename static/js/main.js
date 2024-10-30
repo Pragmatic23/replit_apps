@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Get form elements with proper null checks
     const form = document.querySelector('form[action="/get_recommendations"]');
     
     // Only proceed if we're on the form page
@@ -13,29 +12,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const editionInputs = form.querySelectorAll('input[name="preferred_edition"]');
     const versionSelect = document.getElementById('current_version');
     
-    // Validate required elements exist
-    if (!editionVersionContainer || !experienceRadios.length) {
-        console.debug('Required form elements not found');
-        return;
-    }
-    
-    // Function to safely toggle form field visibility and requirements
+    // Function to safely update form fields
     function updateFormFields(showFields) {
         try {
-            // Update container visibility
-            editionVersionContainer.style.display = showFields ? 'block' : 'none';
+            if (editionVersionContainer) {
+                editionVersionContainer.style.display = showFields ? 'block' : 'none';
+            }
             
-            // Update edition inputs
-            editionInputs.forEach(input => {
-                if (input) {
-                    input.required = showFields;
-                }
-            });
+            if (editionInputs) {
+                editionInputs.forEach(input => {
+                    if (input) {
+                        input.required = showFields;
+                        if (!showFields) {
+                            input.checked = false;
+                        }
+                    }
+                });
+            }
             
-            // Update version select
             if (versionSelect) {
                 versionSelect.required = showFields;
-                // Reset selection when hiding
                 if (!showFields) {
                     versionSelect.selectedIndex = 0;
                 }
@@ -45,16 +41,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Handle experience radio changes
-    experienceRadios.forEach(radio => {
-        if (radio) {
-            radio.addEventListener('change', function(event) {
-                updateFormFields(event.target.value === 'yes');
-            });
-        }
-    });
+    // Only add event listeners if elements exist
+    if (experienceRadios) {
+        experienceRadios.forEach(radio => {
+            if (radio) {
+                radio.addEventListener('change', function() {
+                    updateFormFields(this.value === 'yes');
+                });
+            }
+        });
+    }
     
-    // Set initial state based on current selection
+    // Set initial state if elements exist
     const selectedExperience = form.querySelector('input[name="has_odoo_experience"]:checked');
-    updateFormFields(selectedExperience && selectedExperience.value === 'yes');
+    if (selectedExperience) {
+        updateFormFields(selectedExperience.value === 'yes');
+    }
 });

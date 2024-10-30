@@ -1,57 +1,60 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Get form elements
+    // Get form elements with proper null checks
+    const form = document.querySelector('form[action="/get_recommendations"]');
+    
+    // Only proceed if we're on the form page
+    if (!form) {
+        console.debug('Not on recommendations form page');
+        return;
+    }
+    
     const editionVersionContainer = document.getElementById('edition-version-container');
-    const experienceRadios = document.querySelectorAll('input[name="has_odoo_experience"]');
-    
-    // Check if we're on the form page
-    if (!editionVersionContainer) {
-        console.debug('Not on form page or container not found');
-        return;
-    }
-
-    if (!experienceRadios || experienceRadios.length === 0) {
-        console.debug('Experience radio buttons not found');
-        return;
-    }
-    
-    const editionInputs = document.querySelectorAll('input[name="preferred_edition"]');
+    const experienceRadios = form.querySelectorAll('input[name="has_odoo_experience"]');
+    const editionInputs = form.querySelectorAll('input[name="preferred_edition"]');
     const versionSelect = document.getElementById('current_version');
     
-    // Function to update form fields visibility and requirements
+    // Validate required elements exist
+    if (!editionVersionContainer || !experienceRadios.length) {
+        console.debug('Required form elements not found');
+        return;
+    }
+    
+    // Function to safely toggle form field visibility and requirements
     function updateFormFields(showFields) {
-        if (editionVersionContainer) {
+        try {
+            // Update container visibility
             editionVersionContainer.style.display = showFields ? 'block' : 'none';
             
-            // Update required attributes
-            if (editionInputs) {
-                editionInputs.forEach(input => {
-                    if (input) {
-                        input.required = showFields;
-                    }
-                });
-            }
+            // Update edition inputs
+            editionInputs.forEach(input => {
+                if (input) {
+                    input.required = showFields;
+                }
+            });
             
+            // Update version select
             if (versionSelect) {
                 versionSelect.required = showFields;
+                // Reset selection when hiding
+                if (!showFields) {
+                    versionSelect.selectedIndex = 0;
+                }
             }
+        } catch (error) {
+            console.error('Error updating form fields:', error);
         }
     }
     
     // Handle experience radio changes
     experienceRadios.forEach(radio => {
         if (radio) {
-            radio.addEventListener('change', function() {
-                updateFormFields(this.value === 'yes');
+            radio.addEventListener('change', function(event) {
+                updateFormFields(event.target.value === 'yes');
             });
         }
     });
-
-    // Set initial state
-    const selectedExperience = document.querySelector('input[name="has_odoo_experience"]:checked');
-    if (selectedExperience) {
-        updateFormFields(selectedExperience.value === 'yes');
-    } else {
-        // If no option is selected, hide the fields by default
-        updateFormFields(false);
-    }
+    
+    // Set initial state based on current selection
+    const selectedExperience = form.querySelector('input[name="has_odoo_experience"]:checked');
+    updateFormFields(selectedExperience && selectedExperience.value === 'yes');
 });

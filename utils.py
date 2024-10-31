@@ -29,43 +29,32 @@ def format_features(features: Optional[List[str]]) -> str:
     return ", ".join(features)
 
 def get_module_info(module_name: str) -> Tuple[str, str]:
-    """
-    Get module URL and image URL from Odoo apps store with improved error handling
-    Returns tuple of (module_url, image_url)
-    """
-    if not module_name:
-        logger.warning("Empty module name provided to get_module_info")
-        return "", ""
-        
-    base_url = "https://apps.odoo.com"
-    search_url = f"{base_url}/apps/search?search={module_name}"
-    
     try:
+        # First try exact match
+        search_url = f"https://apps.odoo.com/apps/modules/14.0/{module_name.lower().replace(' ', '_')}"
         response = requests.get(search_url, timeout=10)
+        
+        if response.status_code == 404:
+            # If exact match fails, try search
+            search_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name}"
+            response = requests.get(search_url, timeout=10)
+        
         response.raise_for_status()
-        
         soup = BeautifulSoup(response.text, 'html.parser')
-        first_result = soup.find('div', class_='o_app_item')
         
-        if first_result:
-            module_link = first_result.find('a')
-            img_tag = first_result.find('img')
-            
-            module_url = f"{base_url}{module_link['href']}" if module_link and 'href' in module_link.attrs else ""
-            image_url = img_tag['src'] if img_tag and 'src' in img_tag.attrs else ""
-            
-            logger.info(f"Successfully found module info for {module_name}")
-            return module_url, image_url
-            
-        logger.warning(f"No results found for module: {module_name}")
-        return "", ""
+        # Try to find module image
+        img_tag = soup.find('img', class_='img-fluid') or soup.find('img', class_='o_image')
+        image_url = img_tag['src'] if img_tag and 'src' in img_tag.attrs else ""
         
-    except requests.RequestException as e:
-        logger.error(f"Request failed for module {module_name}: {str(e)}")
-        return "", ""
+        # If no image found, use default icon
+        if not image_url:
+            image_url = "/static/images/default_module_icon.png"
+            
+        return search_url, image_url
+        
     except Exception as e:
-        logger.error(f"Unexpected error fetching module info for {module_name}: {str(e)}")
-        return "", ""
+        logger.error(f"Error fetching module info for {module_name}: {str(e)}")
+        return "", "/static/images/default_module_icon.png"
 
 def parse_module_response(content: str) -> List[Dict[str, str]]:
     """Parse the OpenAI response content into structured module data."""

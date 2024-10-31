@@ -17,6 +17,7 @@ from PIL import Image as PILImage
 from werkzeug.utils import secure_filename
 import tempfile
 import io
+import re
 
 UPLOAD_FOLDER = 'static/uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -30,6 +31,19 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def is_valid_email(email):
+    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(pattern, email) is not None
+
+def is_valid_username(username):
+    return len(username) >= 3 and re.match(r'^[a-zA-Z0-9_-]+$', username)
+
+def is_strong_password(password):
+    return (len(password) >= 8 and 
+            re.search(r'[A-Z]', password) and 
+            re.search(r'[a-z]', password) and 
+            re.search(r'[0-9]', password))
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -38,25 +52,21 @@ def index():
 @login_required
 def get_recommendations():
     try:
-        # Get all form fields
         industry = request.form.get('industry')
         features = request.form.getlist('features')
         requirements = request.form.get('requirements', '')
         
-        # Get new fields
         customer_website = request.form.get('customer_website', '')
         has_odoo_experience = request.form.get('has_odoo_experience')
         preferred_edition = request.form.get('preferred_edition')
         current_version = request.form.get('current_version')
         
-        # Get existing additional fields
         company_size = request.form.get('company_size')
         deployment = request.form.get('deployment')
         region = request.form.get('region')
         integrations = request.form.getlist('integrations')
         languages = request.form.getlist('languages')
         
-        # Create a detailed requirements string
         detailed_requirements = f"""
 Business Information:
 Industry: {industry}
@@ -79,7 +89,6 @@ Additional Requirements:
 {requirements}
 """
         
-        # Get recommendations with updated context
         recommendations = get_module_recommendations(
             requirements=detailed_requirements,
             industry=industry,
@@ -92,7 +101,6 @@ Additional Requirements:
             flash(recommendations['error'], 'error')
             return redirect(url_for('index'))
             
-        # Create recommendation record if successful
         recommendation = Recommendation(
             requirements=detailed_requirements,
             recommendations=recommendations['text'],
@@ -117,14 +125,11 @@ def export_recommendations(recommendation_id):
     try:
         recommendation = Recommendation.query.get_or_404(recommendation_id)
         
-        # Create a temporary file for the PDF
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-            # Create PDF document
             doc = SimpleDocTemplate(tmp_file.name, pagesize=letter)
             styles = getSampleStyleSheet()
             story = []
             
-            # Title
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Title'],
@@ -134,16 +139,13 @@ def export_recommendations(recommendation_id):
             story.append(Paragraph("Odoo Module Recommendations", title_style))
             story.append(Spacer(1, 20))
             
-            # Requirements section
             story.append(Paragraph("Business Requirements", styles['Heading1']))
             story.append(Paragraph(recommendation.requirements, styles['Normal']))
             story.append(Spacer(1, 20))
             
-            # Recommendations section
             story.append(Paragraph("Recommended Modules", styles['Heading1']))
             story.append(Paragraph(recommendation.recommendations, styles['Normal']))
             
-            # Build PDF
             doc.build(story)
             
             return send_file(
@@ -164,13 +166,37 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        remember = request.form.get('remember', False) == 'on'
+        
+        if not email or not password:
+            flash('Please fill in all fields', 'danger')
+            return redirect(url_for('login'))
+            
+        if not is_valid_email(email):
+            flash('Please enter a valid email address', 'danger')
+            return redirect(url_for('login'))
+            
         user = User.query.filter_by(email=email).first()
         
         if user and user.check_password(password):
-            login_user(user)
+            current_session = UserSession.query.filter_by(
+                user_id=user.id, 
+                session_end=None
+            ).first()
+            
+            if current_session:
+                current_session.session_end = datetime.utcnow()
+                db.session.commit()
+            
+            new_session = UserSession(user_id=user.id)
+            db.session.add(new_session)
+            db.session.commit()
+            
+            login_user(user, remember=remember)
+            flash('Successfully logged in!', 'success')
             return redirect(url_for('index'))
         else:
-            flash('Invalid email or password')
+            flash('Invalid email or password', 'danger')
             
     return render_template('login.html')
 
@@ -185,20 +211,45 @@ def signup():
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
         
+        if not all([username, email, password, confirm_password]):
+            flash('Please fill in all fields', 'danger')
+            return redirect(url_for('signup'))
+            
+        if not is_valid_username(username):
+            flash('Username must be at least 3 characters and contain only letters, numbers, underscores, and hyphens', 'danger')
+            return redirect(url_for('signup'))
+            
+        if not is_valid_email(email):
+            flash('Please enter a valid email address', 'danger')
+            return redirect(url_for('signup'))
+            
+        if not is_strong_password(password):
+            flash('Password must be at least 8 characters and contain uppercase, lowercase, and numbers', 'danger')
+            return redirect(url_for('signup'))
+            
         if password != confirm_password:
-            flash('Passwords do not match')
+            flash('Passwords do not match', 'danger')
             return redirect(url_for('signup'))
             
         if User.query.filter_by(email=email).first():
-            flash('Email already registered')
+            flash('Email already registered', 'danger')
+            return redirect(url_for('signup'))
+            
+        if User.query.filter_by(username=username).first():
+            flash('Username already taken', 'danger')
             return redirect(url_for('signup'))
             
         user = User(username=username, email=email)
         user.set_password(password)
         db.session.add(user)
+        
+        session = UserSession(user_id=user.id)
+        db.session.add(session)
+        
         db.session.commit()
         
         login_user(user)
+        flash('Account created successfully!', 'success')
         return redirect(url_for('index'))
         
     return render_template('signup.html')
@@ -206,8 +257,18 @@ def signup():
 @app.route('/logout')
 @login_required
 def logout():
+    current_session = UserSession.query.filter_by(
+        user_id=current_user.id, 
+        session_end=None
+    ).first()
+    
+    if current_session:
+        current_session.session_end = datetime.utcnow()
+        db.session.commit()
+    
     logout_user()
-    return redirect(url_for('index'))
+    flash('Successfully logged out', 'info')
+    return redirect(url_for('login'))
 
 @app.route('/admin/dashboard')
 @login_required

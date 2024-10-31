@@ -4,15 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Odoo Module Recommender</title>
+    <!-- Preconnect hints -->
+    <link rel="preconnect" href="https://cdn.replit.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <!-- Bootstrap and Font Awesome CSS -->
     <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/solid.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/brands.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/custom.css">
+    <style>
+        :root {
+            --gradient-start: var(--bs-primary-bg-subtle);
+            --gradient-end: var(--bs-body-bg);
+        }
+        
+        .fa-odoo {
+            color: var(--bs-primary);
+            font-size: 3rem;
+        }
+
+        .navbar {
+            background: var(--bs-dark);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-brand .fa-odoo {
+            font-size: 1.5rem;
+        }
+
+        .card {
+            border: none;
+            background: var(--bs-dark);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .bg-gradient {
+            background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
+
+        .form-control-lg {
+            font-size: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bs-body-bg);
+            border-color: var(--bs-border-color);
+        }
+
+        .form-control-lg:focus {
+            background: var(--bs-body-bg);
+            border-color: var(--bs-primary);
+            box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+        }
+
+        .btn-outline-secondary {
+            border-color: var(--bs-border-color);
+            color: var(--bs-body-color);
+        }
+
+        .btn-outline-secondary:hover {
+            background-color: var(--bs-secondary);
+            border-color: var(--bs-secondary);
+            color: var(--bs-light);
+        }
+
+        .input-group-text {
+            background: var(--bs-dark);
+            border-color: var(--bs-border-color);
+            color: var(--bs-body-color);
+        }
+
+        .alert {
+            border: none;
+            border-radius: 0.5rem;
+        }
+
+        .text-decoration-none {
+            color: var(--bs-primary);
+        }
+
+        .text-decoration-none:hover {
+            color: var(--bs-primary-text-emphasis);
+        }
+        
+        .auth-card {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <i class="fab fa-odoo me-2"></i>Odoo Module Recommender
+                <i class="fa-brands fa-odoo me-2"></i>
+                Odoo Module Recommender
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -21,17 +108,29 @@
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
                         <li class="nav-item">
-                            <span class="nav-link">Welcome, {{ current_user.username }}</span>
+                            <span class="nav-link">
+                                <i class="fa-solid fa-user me-2"></i>
+                                Welcome, {{ current_user.username }}
+                            </span>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="fa-solid fa-sign-out-alt me-2"></i>
+                                Logout
+                            </a>
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                            <a class="nav-link" href="{{ url_for('login') }}">
+                                <i class="fa-solid fa-sign-in-alt me-2"></i>
+                                Login
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('signup') }}">Sign Up</a>
+                            <a class="nav-link" href="{{ url_for('signup') }}">
+                                <i class="fa-solid fa-user-plus me-2"></i>
+                                Sign Up
+                            </a>
                         </li>
                     {% endif %}
                 </ul>
@@ -39,11 +138,15 @@
         </div>
     </nav>
     
-    <main class="container my-4">
+    <main>
         {% block content %}{% endblock %}
     </main>
 
+    <!-- Bootstrap Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Font Awesome JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <!-- Custom JS -->
     <script src="/static/js/main.js"></script>
 </body>
 </html>

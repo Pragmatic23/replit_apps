@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.font-awesome
     pkgs.zlib
     pkgs.tk
     pkgs.tcl

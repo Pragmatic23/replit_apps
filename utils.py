@@ -29,32 +29,22 @@ def format_features(features: Optional[List[str]]) -> str:
     return ", ".join(features)
 
 def get_module_info(module_name: str) -> Tuple[str, str]:
+    # Always use the main Odoo Apps URL
+    url = "https://apps.odoo.com/"
+    
     try:
-        # First try exact match
-        search_url = f"https://apps.odoo.com/apps/modules/14.0/{module_name.lower().replace(' ', '_')}"
-        response = requests.get(search_url, timeout=10)
-        
-        if response.status_code == 404:
-            # If exact match fails, try search
-            search_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name}"
-            response = requests.get(search_url, timeout=10)
-        
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Try to find module image
-        img_tag = soup.find('img', class_='img-fluid') or soup.find('img', class_='o_image')
-        image_url = img_tag['src'] if img_tag and 'src' in img_tag.attrs else ""
-        
-        # If no image found, use default icon
-        if not image_url:
-            image_url = "/static/images/default_module_icon.png"
-            
-        return search_url, image_url
-        
+        # Generate DALL-E image for the module
+        response = openai_client.images.generate(
+            prompt=f"Professional icon for {module_name} Odoo module, business software interface, minimalist design",
+            size="256x256",
+            quality="standard",
+            n=1,
+        )
+        image_url = response.data[0].url
+        return url, image_url
     except Exception as e:
-        logger.error(f"Error fetching module info for {module_name}: {str(e)}")
-        return "", "/static/images/default_module_icon.png"
+        logger.error(f"Error generating image for {module_name}: {str(e)}")
+        return url, "/static/images/default_module_icon.svg"
 
 def parse_module_response(content: str) -> List[Dict[str, str]]:
     """Parse the OpenAI response content into structured module data."""

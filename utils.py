@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import json
 import logging
 from typing import Union
+import re
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -75,33 +76,28 @@ def parse_module_response(content: str) -> List[Dict[str, str]]:
     modules = []
     try:
         # Split into module sections and process each
-        module_sections = [s.strip() for s in content.split('\n\n') if s.strip()]
+        sections = content.strip().split('\n\n')
         
-        for section in module_sections:
+        for section in sections:
             lines = [line.strip() for line in section.split('\n') if line.strip()]
             if len(lines) < 2:
                 continue
                 
-            # Extract module name and clean it
-            module_name = lines[0]
-            for char in ['*', '#', '-', '•']:
-                module_name = module_name.replace(char, '').strip()
-                
-            # Get description (everything after the name)
-            description = lines[1].strip()
-            if not module_name or not description:
-                continue
-                
-            # Get additional info
-            module_url, image_url = get_module_info(module_name)
+            # Clean module name (remove numbers and special characters)
+            module_name = re.sub(r'^\d+\.\s*', '', lines[0])  # Remove leading numbers
+            module_name = re.sub(r'^Module Name:\s*', '', module_name)  # Remove "Module Name:" prefix
+            module_name = module_name.strip()
             
-            modules.append({
-                'name': module_name,
-                'description': description,
-                'url': module_url,
-                'image': image_url
-            })
-            
+            description = lines[1]
+            if module_name and description:
+                url, image = get_module_info(module_name)
+                modules.append({
+                    'name': module_name,
+                    'description': description,
+                    'url': url or '',
+                    'image': image or ''
+                })
+        
         return modules
         
     except Exception as e:
@@ -139,29 +135,16 @@ def get_module_recommendations(
         context = "\n".join(context_parts)
         logger.info("Generated context for recommendation request")
 
-        prompt = f'''As an Odoo technical consultant with extensive experience, recommend 4 official Odoo modules that best address the following business requirements.
+        prompt = f'''As an Odoo technical consultant, recommend 4 specific Odoo modules that best address the following business requirements.
+
+For each module provide:
+1. Module Name (exact name as shown in Odoo Apps store, e.g. "CRM", "Inventory", "Point of Sale")
+2. Brief description (1-2 sentences about core functionality)
 
 Business Context:
 {context}
 
-For each module provide:
-1. Module Name (official Odoo module name)
-2. One-line description highlighting the core business value and primary use case
-
-Important considerations:
-- Recommend only official Odoo modules from the Odoo Apps store
-- Focus on modules that integrate well with each other
-- Consider scalability and future business growth
-- Prioritize modules based on the industry-specific needs
-- Take into account the required features for the best fit
-- Consider the user's Odoo experience level when suggesting modules
-- Ensure recommendations align with the preferred Odoo edition (Community/Enterprise)
-- For users new to Odoo, prioritize more user-friendly modules
-- For experienced users, consider more advanced modules if appropriate
-
-Present each recommendation in a clear, structured format:
-Module Name
-[Concise description focused on business value]'''
+Important: Use exact module names from Odoo Apps store'''
 
         logger.info("Making OpenAI API request")
         response = openai_client.chat.completions.create(

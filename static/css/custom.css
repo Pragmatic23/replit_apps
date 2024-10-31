@@ -12,19 +12,23 @@
     min-height: 100vh;
 }
 
-/* Remove white background and improve text readability */
-.recommendations-header {
-    background: transparent;
-    padding: 2rem 0;
-}
-
+/* Remove header background and enhance heading */
 .recommendations-heading {
-    font-size: 2.5rem;
+    font-size: 2.8rem;
     font-weight: 700;
     color: var(--bs-primary);
     text-align: center;
-    margin-bottom: 1.5rem;
-    letter-spacing: 0.5px;
+    margin: 2rem 0;
+    background: linear-gradient(120deg, #7c3aed, #2563eb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+    letter-spacing: -0.5px;
+}
+
+/* Ensure proper spacing in main content */
+main.container {
+    padding-top: 1rem;
 }
 
 /* Module card styles */
@@ -109,8 +113,7 @@
 
 /* Grid system */
 .row.g-4 {
-    margin: -1rem;
-    padding: 1rem;
+    margin-top: 1rem;
 }
 
 /* Responsive adjustments */

@@ -179,20 +179,13 @@ def login():
         user = User.query.filter_by(email=email).first()
         
         if user and user.check_password(password):
-            current_session = UserSession.query.filter_by(
-                user_id=user.id, 
-                session_end=None
-            ).first()
+            login_user(user, remember=remember)
             
-            if current_session:
-                current_session.session_end = datetime.utcnow()
-                db.session.commit()
-            
+            # Create new session after successful login
             new_session = UserSession(user_id=user.id)
             db.session.add(new_session)
             db.session.commit()
             
-            login_user(user, remember=remember)
             flash('Successfully logged in!', 'success')
             return redirect(url_for('index'))
         else:
@@ -238,33 +231,49 @@ def signup():
         if User.query.filter_by(username=username).first():
             flash('Username already taken', 'danger')
             return redirect(url_for('signup'))
+        
+        try:
+            # Create and save the user first
+            user = User(username=username, email=email)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.flush()  # This will assign an ID to the user
             
-        user = User(username=username, email=email)
-        user.set_password(password)
-        db.session.add(user)
-        
-        session = UserSession(user_id=user.id)
-        db.session.add(session)
-        
-        db.session.commit()
-        
-        login_user(user)
-        flash('Account created successfully!', 'success')
-        return redirect(url_for('index'))
+            # Now create the session with the user's ID
+            session = UserSession(user_id=user.id)
+            db.session.add(session)
+            
+            # Commit all changes
+            db.session.commit()
+            
+            # Log the user in
+            login_user(user)
+            flash('Account created successfully!', 'success')
+            return redirect(url_for('index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'An error occurred during registration. Please try again.', 'danger')
+            return redirect(url_for('signup'))
         
     return render_template('signup.html')
 
 @app.route('/logout')
 @login_required
 def logout():
-    current_session = UserSession.query.filter_by(
-        user_id=current_user.id, 
-        session_end=None
-    ).first()
-    
-    if current_session:
-        current_session.session_end = datetime.utcnow()
-        db.session.commit()
+    if current_user.is_authenticated:
+        # End the current session if it exists
+        current_session = UserSession.query.filter_by(
+            user_id=current_user.id, 
+            session_end=None
+        ).first()
+        
+        if current_session:
+            current_session.session_end = datetime.utcnow()
+            try:
+                db.session.commit()
+            except:
+                db.session.rollback()
     
     logout_user()
     flash('Successfully logged out', 'info')

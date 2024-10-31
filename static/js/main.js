@@ -4,28 +4,35 @@ document.addEventListener('DOMContentLoaded', function() {
         console.debug(`[Odoo Form]: ${message}`);
     }
 
-    // Get the form and validate we're on the right page
-    const form = document.querySelector('form[action="/get_recommendations"]');
-    if (form) {
-        // Recommendations form logic
-        const editionVersionContainer = document.getElementById('edition-version-container');
-        const experienceRadios = form.querySelectorAll('input[name="has_odoo_experience"]');
-        const editionInputs = form.querySelectorAll('input[name="preferred_edition"]');
-        const versionSelect = document.getElementById('current_version');
+    // Get the form elements
+    const recommendationsForm = document.querySelector('form[action="/get_recommendations"]');
+    const authForm = document.querySelector('form.needs-validation');
 
+    // Handle recommendations form if it exists
+    if (recommendationsForm) {
+        debug('Recommendations form found - initializing');
+        
+        const editionVersionContainer = document.getElementById('edition-version-container');
+        const experienceRadios = recommendationsForm.querySelectorAll('input[name="has_odoo_experience"]');
+        
         if (editionVersionContainer && experienceRadios.length) {
             debug('Form elements found - initializing conditional logic');
+            
+            const editionInputs = recommendationsForm.querySelectorAll('input[name="preferred_edition"]');
+            const versionSelect = document.getElementById('current_version');
 
             // Function to safely update form fields with error handling
             function updateFormFields(showFields) {
                 try {
-                    editionVersionContainer.style.opacity = '0';
-                    editionVersionContainer.style.display = showFields ? 'block' : 'none';
-                    setTimeout(() => {
-                        if (editionVersionContainer.style.display === 'block') {
-                            editionVersionContainer.style.opacity = '1';
-                        }
-                    }, 50);
+                    if (editionVersionContainer) {
+                        editionVersionContainer.style.opacity = '0';
+                        editionVersionContainer.style.display = showFields ? 'block' : 'none';
+                        setTimeout(() => {
+                            if (editionVersionContainer.style.display === 'block') {
+                                editionVersionContainer.style.opacity = '1';
+                            }
+                        }, 50);
+                    }
 
                     editionInputs.forEach(input => {
                         if (input) {
@@ -46,13 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     debug(`Form fields updated - Experience: ${showFields ? 'Yes' : 'No'}`);
                 } catch (error) {
                     console.error('[Odoo Form Error]:', error);
-                    if (editionVersionContainer) {
-                        editionVersionContainer.style.display = showFields ? 'block' : 'none';
-                    }
                 }
             }
 
-            editionVersionContainer.style.transition = 'opacity 0.3s ease-in-out';
+            if (editionVersionContainer) {
+                editionVersionContainer.style.transition = 'opacity 0.3s ease-in-out';
+            }
 
             experienceRadios.forEach(radio => {
                 radio.addEventListener('change', function(event) {
@@ -62,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
 
-            const selectedExperience = form.querySelector('input[name="has_odoo_experience"]:checked');
+            const selectedExperience = recommendationsForm.querySelector('input[name="has_odoo_experience"]:checked');
             if (selectedExperience) {
                 const hasExperience = selectedExperience.value === 'yes';
                 debug(`Initializing form with experience: ${hasExperience ? 'Yes' : 'No'}`);
@@ -75,24 +81,27 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         debug('Not on recommendations form page - checking for auth forms');
         
-        // Auth forms validation and enhancement
-        const authForm = document.querySelector('form.needs-validation');
+        // Handle auth forms if they exist
         if (authForm) {
             debug('Auth form found - initializing validation');
 
             // Password toggle functionality
-            const setupPasswordToggle = (inputId, toggleId) => {
+            function setupPasswordToggle(inputId, toggleId) {
                 const input = document.getElementById(inputId);
                 const toggle = document.getElementById(toggleId);
+                
                 if (input && toggle) {
                     toggle.addEventListener('click', () => {
                         const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
                         input.setAttribute('type', type);
-                        toggle.querySelector('i').classList.toggle('fa-eye');
-                        toggle.querySelector('i').classList.toggle('fa-eye-slash');
+                        const icon = toggle.querySelector('i');
+                        if (icon) {
+                            icon.classList.toggle('fa-eye');
+                            icon.classList.toggle('fa-eye-slash');
+                        }
                     });
                 }
-            };
+            }
 
             setupPasswordToggle('password', 'togglePassword');
             setupPasswordToggle('confirm_password', 'toggleConfirmPassword');
@@ -120,9 +129,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Clear custom validity on input
             const inputs = authForm.querySelectorAll('input');
             inputs.forEach(input => {
-                input.addEventListener('input', () => {
-                    input.setCustomValidity('');
-                });
+                if (input) {
+                    input.addEventListener('input', () => {
+                        input.setCustomValidity('');
+                    });
+                }
             });
         }
     }

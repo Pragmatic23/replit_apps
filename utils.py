@@ -29,13 +29,22 @@ def format_features(features: Optional[List[str]]) -> str:
     return ", ".join(features)
 
 def get_module_info(module_name: str) -> Tuple[str, str]:
-    # Always use the main Odoo Apps URL
-    url = "https://apps.odoo.com/"
+    """Get module URL and generate an image for the module."""
+    base_url = "https://apps.odoo.com/apps/modules"
+    search_query = module_name.lower().replace(" ", "-")
+    url = f"{base_url}/browse?search={search_query}"
     
     try:
-        # Generate DALL-E image for the module
+        # Generate DALL-E image for the module with improved prompt
+        prompt = f"""Create a professional, minimalist icon for an Odoo {module_name} module.
+        Style: Modern, corporate, clean design
+        Colors: Use purple and white as primary colors
+        Layout: Simple, recognizable business software interface elements
+        Theme: Professional enterprise software
+        No text or words in the image"""
+        
         response = openai_client.images.generate(
-            prompt=f"Professional icon for {module_name} Odoo module, business software interface, minimalist design",
+            prompt=prompt,
             size="256x256",
             quality="standard",
             n=1,
@@ -47,34 +56,44 @@ def get_module_info(module_name: str) -> Tuple[str, str]:
         return url, "/static/images/default_module_icon.svg"
 
 def parse_module_response(content: str) -> List[Dict[str, str]]:
-    """Parse the OpenAI response content into structured module data."""
+    """Parse the OpenAI response content into structured module data with improved parsing."""
     if not content or not isinstance(content, str):
         logger.error("Invalid content provided for parsing")
         return []
         
     modules = []
     try:
-        # Split into module sections and process each
-        sections = content.strip().split('\n\n')
+        # Split content into module sections
+        pattern = r'(?:^|\n\n)(?:\d+\.|Module:)\s*(.*?)(?=(?:\n\n(?:\d+\.|Module:)|$))'
+        sections = re.finditer(pattern, content, re.DOTALL)
         
         for section in sections:
-            lines = [line.strip() for line in section.split('\n') if line.strip()]
+            section_text = section.group(1).strip()
+            lines = [line.strip() for line in section_text.split('\n') if line.strip()]
+            
             if len(lines) < 2:
                 continue
-                
-            # Clean module name (remove numbers and special characters)
-            module_name = re.sub(r'^\d+\.\s*', '', lines[0])  # Remove leading numbers
-            module_name = re.sub(r'^Module Name:\s*', '', module_name)  # Remove "Module Name:" prefix
+            
+            # Extract module name and clean it
+            module_name = re.sub(r'^(Module(?: Name)?:?\s*)', '', lines[0], flags=re.IGNORECASE)
             module_name = module_name.strip()
             
-            description = lines[1]
+            # Extract description
+            description_lines = []
+            for line in lines[1:]:
+                if line.lower().startswith(('description:', 'features:', 'benefits:')):
+                    line = re.sub(r'^(Description|Features|Benefits):?\s*', '', line, flags=re.IGNORECASE)
+                description_lines.append(line)
+            
+            description = ' '.join(description_lines)
+            
             if module_name and description:
                 url, image = get_module_info(module_name)
                 modules.append({
                     'name': module_name,
                     'description': description,
-                    'url': url or '',
-                    'image': image or ''
+                    'url': url,
+                    'image': image
                 })
         
         return modules
@@ -90,47 +109,74 @@ def get_module_recommendations(
     preferred_edition: str = "community",
     has_experience: str = "no"
 ) -> Dict[str, Any]:
-    """
-    Get module recommendations using OpenAI API with improved error handling
-    and response processing
-    """
+    """Get module recommendations using OpenAI API with enhanced context and improved response handling."""
     try:
         if not OPENAI_API_KEY:
             logger.error("OpenAI API key is not configured")
             return {"error": "OpenAI API key is not configured"}
 
-        # Create context from inputs
+        # Create detailed context from inputs
         context_parts = []
         if industry:
             context_parts.append(f"Industry: {industry}")
+            context_parts.append("Industry-specific requirements and best practices will be considered.")
+        
         if features:
             context_parts.append(f"Required Features: {format_features(features)}")
+            context_parts.append("These features are essential for the business operations.")
+        
         if preferred_edition:
-            context_parts.append(f"Preferred Edition: {preferred_edition.title()}")
-        context_parts.append(f"Previous Odoo Experience: {'Yes' if has_experience == 'yes' else 'No'}")
+            edition_context = f"Preferred Edition: {preferred_edition.title()}"
+            if preferred_edition.lower() == "community":
+                edition_context += " (Focus on core features available in the free edition)"
+            else:
+                edition_context += " (Include advanced enterprise features)"
+            context_parts.append(edition_context)
+        
+        experience_level = "Yes" if has_experience == "yes" else "No"
+        context_parts.append(f"Previous Odoo Experience: {experience_level}")
+        if experience_level == "No":
+            context_parts.append("Recommendations should focus on user-friendly modules with good documentation and support.")
+        
         if requirements:
-            context_parts.append(f"Additional Requirements: {requirements}")
+            context_parts.append("Additional Requirements:")
+            context_parts.append(requirements)
 
         context = "\n".join(context_parts)
-        logger.info("Generated context for recommendation request")
+        logger.info("Generated enhanced context for recommendation request")
 
-        prompt = f'''As an Odoo technical consultant, recommend 4 specific Odoo modules that best address the following business requirements.
+        prompt = f'''As an experienced Odoo technical consultant, recommend 4 specific Odoo modules that best address the following business requirements. Focus on practical implementation and value delivery.
 
 For each module provide:
-1. Module Name (exact name as shown in Odoo Apps store, e.g. "CRM", "Inventory", "Point of Sale")
-2. Brief description (1-2 sentences about core functionality)
+1. Module Name (exact name as shown in Odoo Apps store)
+2. Brief description including:
+   - Core purpose and main functionality
+   - Key benefits for the business
+   - Integration capabilities
+   - Ease of implementation considering the user's experience level
 
 Business Context:
 {context}
 
-Important: Use exact module names from Odoo Apps store'''
+Guidelines:
+- Recommend official Odoo modules when possible
+- Consider the user's experience level when suggesting complex modules
+- Focus on modules that integrate well with each other
+- Prioritize stable, well-maintained modules
+- Suggest modules that align with the preferred edition (Community/Enterprise)
 
-        logger.info("Making OpenAI API request")
+Format each recommendation as:
+Module: [Exact Module Name]
+Description: [Core functionality and benefits]
+Features: [Key features and integration points]
+Benefits: [Business value and implementation considerations]'''
+
+        logger.info("Making OpenAI API request with enhanced prompt")
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=1000
+            temperature=0.2,  # Reduced for more consistent responses
+            max_tokens=1500   # Increased for more detailed responses
         )
 
         if not response or not response.choices:
@@ -142,13 +188,13 @@ Important: Use exact module names from Odoo Apps store'''
             logger.error("Empty content in OpenAI API response")
             return {"error": "No recommendations generated"}
 
-        # Parse modules with improved error handling
+        # Parse modules with improved handling
         modules = parse_module_response(content)
         if not modules:
             logger.error("No valid modules parsed from response")
             return {"error": "No valid recommendations found"}
 
-        # Prepare the response
+        # Prepare the response with module details
         urls = {module['name']: module['url'] for module in modules if module['url']}
         images = {module['name']: module['image'] for module in modules if module['image']}
 

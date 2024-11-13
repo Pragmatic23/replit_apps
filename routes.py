@@ -90,6 +90,19 @@ def register_routes(app):
     {requirements}
     """
             
+            # Check if client accepts Server-Sent Events
+            if request.headers.get('Accept') == 'text/event-stream':
+                recommendations = get_module_recommendations(
+                    requirements=detailed_requirements,
+                    industry=industry,
+                    features=features,
+                    preferred_edition=preferred_edition,
+                    has_experience=has_odoo_experience,
+                    stream=True
+                )
+                return recommendations
+            
+            # Regular synchronous response
             recommendations = get_module_recommendations(
                 requirements=detailed_requirements,
                 industry=industry,

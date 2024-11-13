@@ -40,14 +40,13 @@ def create_app():
     # Configure database with optimized connection pooling
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///odoo_recommender.db")
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_size": 5,  # Reduced for better resource utilization
+        "pool_size": 5,
         "max_overflow": 10,
         "pool_timeout": 20,
-        "pool_recycle": 1800,  # Recycle connections every 30 minutes
-        "pool_pre_ping": True  # Enable connection health checks
+        "pool_recycle": 1800,
+        "pool_pre_ping": True
     }
     
-    # Disable SQLAlchemy event system and modification tracking
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     
     # Initialize extensions
@@ -71,10 +70,9 @@ def create_app():
 app = create_app()
 
 if __name__ == "__main__":
-    # Set up server with optimized settings
     app.run(
         host="0.0.0.0",
         port=5000,
         threaded=True,
-        use_reloader=False  # Disable reloader in production
+        use_reloader=False
     )

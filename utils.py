@@ -5,10 +5,11 @@ import logging
 import re
 from datetime import datetime
 from tenacity import retry, stop_after_attempt, wait_exponential
-from cache_utils import cache_response
+from cache_utils import cache_recommendation
 from flask import Response, stream_with_context
 import json
 import threading
+from openai.types.chat import ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -57,19 +58,17 @@ def get_module_icon(module_name: str) -> Dict[str, str]:
 def stream_openai_response(prompt: str) -> Generator[str, None, None]:
     """Stream OpenAI API response with improved error handling and optimization."""
     try:
-        from openai.types.chat import ChatCompletion
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
+            ChatCompletionSystemMessageParam(role="system", content=SYSTEM_PROMPT),
+            ChatCompletionUserMessageParam(role="user", content=prompt)
         ]
         
-        response: ChatCompletion = openai_client.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=messages,
             temperature=0.1,  # Reduced for more consistent responses
             max_tokens=500,  # Optimized token limit
-            stream=True,
-            timeout=15  # Reduced timeout for faster failure detection
+            stream=True
         )
         
         for chunk in response:
@@ -80,7 +79,7 @@ def stream_openai_response(prompt: str) -> Generator[str, None, None]:
         logger.error(f"Error streaming OpenAI response: {str(e)}", exc_info=True)
         yield json.dumps({"error": str(e)})
 
-@cache_response(expiration=3600)
+@cache_recommendation(expiration=3600)
 def get_module_recommendations(
     requirements: str = "",
     industry: str = "",
@@ -120,13 +119,14 @@ Benefits: [Business value]'''
                 content_type='text/event-stream'
             )
 
-        from openai.types.chat import ChatCompletion
-        response: ChatCompletion = openai_client.chat.completions.create(
+        messages = [
+            ChatCompletionSystemMessageParam(role="system", content=SYSTEM_PROMPT),
+            ChatCompletionUserMessageParam(role="user", content=prompt)
+        ]
+
+        response = openai_client.chat.completions.create(
             model="gpt-4",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
+            messages=messages,
             temperature=0.1,
             max_tokens=500
         )

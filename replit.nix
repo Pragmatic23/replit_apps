@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.redis
     pkgs.font-awesome
     pkgs.zlib
     pkgs.tk

@@ -3,6 +3,13 @@ from flask import Flask
 from extensions import db, login_manager
 from models import User, Recommendation, UserSession
 from flask_compress import Compress
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import redis
+from redis.exceptions import ConnectionError as RedisConnectionError
+import logging
+
+logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
@@ -10,22 +17,45 @@ def create_app():
     # Enable compression
     Compress(app)
     
+    # Configure Redis with fallback
+    try:
+        redis_client = redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379"))
+        redis_client.ping()  # Test connection
+        
+        # Configure rate limiting with Redis
+        limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            default_limits=["200 per day", "50 per hour"],
+            storage_uri=os.environ.get("REDIS_URL", "redis://localhost:6379")
+        )
+        logger.info("Rate limiting enabled with Redis storage")
+    except RedisConnectionError:
+        # Fallback to in-memory storage if Redis is not available
+        limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            default_limits=["200 per day", "50 per hour"],
+            storage_uri="memory://"
+        )
+        logger.warning("Redis unavailable. Using in-memory storage for rate limiting")
+    
     app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "odoo-recommender-secret-key"
     
     # Configure database with optimized settings
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///odoo_recommender.db")
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_size": 10,  # Maximum number of connections
-        "pool_recycle": 300,  # Recycle connections after 5 minutes
-        "pool_pre_ping": True,  # Test connections before using them
-        "max_overflow": 20,  # Allow up to 20 connections beyond pool_size
-        "pool_timeout": 30,  # Wait up to 30 seconds for a connection
-        "echo": False,  # Disable SQL echo for production
-        "max_identifier_length": 63  # PostgreSQL max identifier length
+        "pool_size": 10,
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+        "max_overflow": 20,
+        "pool_timeout": 30,
+        "echo": False,
+        "max_identifier_length": 63
     }
     
     # Additional performance configurations
-    app.config['TEMPLATES_AUTO_RELOAD'] = False  # Disable in production
+    app.config['TEMPLATES_AUTO_RELOAD'] = False
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # Cache static files for 1 year
     
     # Initialize extensions
@@ -34,7 +64,8 @@ def create_app():
     
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        # Use Session.get() instead of Query.get()
+        return db.session.get(User, int(user_id))
     
     # Import and register routes
     from routes import register_routes

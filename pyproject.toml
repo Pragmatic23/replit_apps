@@ -20,4 +20,7 @@ dependencies = [
     "aiohttp>=3.10.10",
     "tenacity>=9.0.0",
     "flask-compress>=1.17",
+    "redis>=5.2.0",
+    "ratelimit>=2.2.1",
+    "flask-limiter>=3.8.0",
 ]

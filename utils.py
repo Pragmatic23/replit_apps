@@ -1,6 +1,6 @@
 import os
 from openai import OpenAI
-from typing import List, Optional, Dict, Tuple, Any, Union
+from typing import List, Optional, Dict, Tuple, Any, Union, Generator
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -13,90 +13,70 @@ from threading import Lock
 from datetime import datetime, timedelta
 import asyncio
 import aiohttp
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from cache_utils import cache_with_redis
+from flask import Response, stream_with_context
+import queue
+import threading
 
 # Configure logging with more detailed format
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(filename)s:%(lineno)d'
 )
 logger = logging.getLogger(__name__)
 
+# OpenAI Configuration
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    logger.error("OpenAI API key is not configured in environment variables")
+    logger.error("OpenAI API key is not configured")
     raise ValueError("OpenAI API key is required")
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Enhanced cache configuration
-class CacheEntry:
-    def __init__(self, data: Any, expiry: datetime):
-        self.data = data
-        self.expiry = expiry
-        self.last_accessed = datetime.now()
-        self.access_count = 0
+# Optimized token usage with shorter prompts
+SYSTEM_PROMPT = """You are an Odoo module expert. Recommend modules based on business requirements.
+Focus on essential features and direct benefits. Be concise and specific."""
 
-class Cache:
-    def __init__(self, max_size: int = 1000):
-        self.data = {}
-        self.max_size = max_size
-        self.lock = Lock()
-        
-    def get(self, key: str) -> Optional[Any]:
-        with self.lock:
-            if key in self.data:
-                entry = self.data[key]
-                if datetime.now() < entry.expiry:
-                    entry.last_accessed = datetime.now()
-                    entry.access_count += 1
-                    return entry.data
-                else:
-                    del self.data[key]
-            return None
-            
-    def set(self, key: str, value: Any, expiry_minutes: int = 60):
-        with self.lock:
-            if len(self.data) >= self.max_size:
-                # Remove least recently used items
-                sorted_items = sorted(
-                    self.data.items(),
-                    key=lambda x: (x[1].last_accessed, -x[1].access_count)
-                )
-                for old_key, _ in sorted_items[:int(self.max_size * 0.2)]:
-                    del self.data[old_key]
-                    
-            self.data[key] = CacheEntry(
-                value,
-                datetime.now() + timedelta(minutes=expiry_minutes)
-            )
+# Image generation queue with size limit
+image_queue = queue.Queue(maxsize=100)
 
-# Initialize caches with different expiration times
-module_cache = Cache(max_size=1000)  # Cache for module information
-recommendation_cache = Cache(max_size=500)  # Cache for recommendations
+def process_image_queue():
+    """Background thread for processing image generation requests with improved error handling."""
+    while True:
+        try:
+            task = image_queue.get(timeout=60)  # 1-minute timeout
+            if task is None:
+                break
+                
+            module_name, callback = task
+            image_info = generate_module_image(module_name)
+            if callback:
+                callback(image_info)
+                
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logger.error(f"Error processing image queue: {str(e)}", exc_info=True)
+        finally:
+            image_queue.task_done()
 
-def format_features(features: Optional[List[str]]) -> str:
-    """Format features list into a readable string."""
-    if not features:
-        return "No specific features selected"
-    return ", ".join(features)
+# Start image processing thread
+image_thread = threading.Thread(target=process_image_queue, daemon=True)
+image_thread.start()
 
 @retry(
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=4, max=10)
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type((TimeoutError, ConnectionError))
 )
-async def fetch_module_info(session: aiohttp.ClientSession, module_name: str) -> Dict[str, str]:
-    """Asynchronously fetch module information."""
+def generate_module_image(module_name: str) -> Dict[str, str]:
+    """Generate module image using DALL-E with optimized prompt."""
     try:
-        # Generate DALL-E image with improved prompt
-        prompt = f"""Create a professional, minimalist icon for an Odoo {module_name} module.
-        Style: Modern, corporate, clean design
-        Colors: Use purple and white as primary colors
-        Layout: Simple, recognizable business software interface elements
-        Theme: Professional enterprise software
-        No text or words in the image"""
+        # Shorter, more focused prompt for token efficiency
+        prompt = f"Minimal icon for Odoo {module_name} module. Modern business style, purple theme."
         
-        response = await openai_client.images.generate(
+        response = openai_client.images.generate(
             prompt=prompt,
             size="256x256",
             quality="standard",
@@ -111,28 +91,118 @@ async def fetch_module_info(session: aiohttp.ClientSession, module_name: str) ->
             'image': image_url
         }
     except Exception as e:
-        logger.error(f"Error fetching module info for {module_name}: {str(e)}")
+        logger.error(f"Error generating image for {module_name}: {str(e)}", exc_info=True)
         return {
             'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
             'image': "/static/images/default_module_icon.svg"
         }
 
-async def get_modules_info_batch(modules: List[str]) -> Dict[str, Dict[str, str]]:
-    """Fetch module information in parallel using asyncio."""
-    async with aiohttp.ClientSession() as session:
-        tasks = [fetch_module_info(session, module) for module in modules]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+def stream_openai_response(prompt: str) -> Generator[str, None, None]:
+    """Stream OpenAI API response with improved error handling."""
+    try:
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ]
         
-        return {
-            module: result if not isinstance(result, Exception) else {
-                'url': f"https://apps.odoo.com/apps/modules/browse?search={module.lower().replace(' ', '-')}",
-                'image': "/static/images/default_module_icon.svg"
-            }
-            for module, result in zip(modules, results)
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=messages,
+            temperature=0.2,
+            max_tokens=1000,  # Reduced for efficiency
+            stream=True
+        )
+        
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+                
+    except Exception as e:
+        logger.error(f"Error streaming OpenAI response: {str(e)}", exc_info=True)
+        yield json.dumps({"error": str(e)})
+
+@cache_with_redis(expiration=3600)  # Cache for 1 hour
+def get_module_recommendations(
+    requirements: str = "",
+    industry: str = "",
+    features: Optional[List[str]] = None,
+    preferred_edition: str = "community",
+    has_experience: str = "no",
+    stream: bool = False
+) -> Union[Dict[str, Any], Response]:
+    """Get module recommendations with streaming support and optimizations."""
+    try:
+        if not OPENAI_API_KEY:
+            logger.error("OpenAI API key is not configured")
+            return {"error": "OpenAI API key is not configured"}
+
+        # Optimize context generation with list comprehension
+        context_parts = [
+            f"Industry: {industry}" if industry else None,
+            f"Features: {', '.join(features)}" if features else None,
+            f"Edition: {preferred_edition.title()}" if preferred_edition else None,
+            f"Experience: {'Yes' if has_experience == 'yes' else 'No'}",
+            f"Requirements: {requirements}" if requirements else None
+        ]
+        
+        # Filter out None values and join
+        context = "\n".join(filter(None, context_parts))
+
+        # Optimized prompt for reduced token usage
+        prompt = f'''Recommend 4 Odoo modules for:\n{context}\n\nFormat:\nModule: [Name]\nDescription: [Core functionality]\nFeatures: [Key features]\nBenefits: [Value]'''
+
+        if stream:
+            return Response(
+                stream_with_context(stream_openai_response(prompt)),
+                content_type='text/event-stream'
+            )
+
+        # Non-streaming response with retry
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=1000
+        )
+
+        content = response.choices[0].message.content
+        if not content:
+            return {"error": "No recommendations generated"}
+
+        # Parse modules with improved error handling
+        modules = parse_module_response(content)
+        if not modules:
+            return {"error": "No valid recommendations found"}
+
+        # Queue image generation with timeout handling
+        module_info = {}
+        for module in modules:
+            try:
+                image_queue.put(
+                    (module['name'], lambda info, name=module['name']: module_info.update({name: info})),
+                    timeout=5
+                )
+            except queue.Full:
+                logger.warning(f"Image generation queue full, skipping image for {module['name']}")
+
+        result = {
+            'text': content,
+            'modules': modules,
+            'urls': {name: info['url'] for name, info in module_info.items()},
+            'images': {name: info['image'] for name, info in module_info.items()}
         }
 
+        return result
+
+    except Exception as e:
+        logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
+        return {"error": f"Unable to generate recommendations: {str(e)}"}
+
 def parse_module_response(content: str) -> List[Dict[str, str]]:
-    """Parse the OpenAI response content into structured module data with improved parsing."""
+    """Parse the OpenAI response content into structured module data with improved error handling."""
     if not content or not isinstance(content, str):
         logger.error("Invalid content provided for parsing")
         return []
@@ -145,53 +215,15 @@ def parse_module_response(content: str) -> List[Dict[str, str]]:
         if not sections:
             return []
             
-        # Process all sections in parallel
+        # Process sections with optimized thread pool
         with ThreadPoolExecutor(max_workers=min(4, len(sections))) as executor:
-            def process_section(section_text: str) -> Optional[Dict[str, str]]:
-                try:
-                    lines = [line.strip() for line in section_text.split('\n') if line.strip()]
-                    if len(lines) < 2:
-                        return None
-                        
-                    module_name = re.sub(r'^(Module(?: Name)?:?\s*)', '', lines[0], flags=re.IGNORECASE)
-                    module_name = module_name.strip()
-                    
-                    description_lines = []
-                    features_lines = []
-                    benefits_lines = []
-                    current_section = description_lines
-                    
-                    for line in lines[1:]:
-                        lower_line = line.lower()
-                        if lower_line.startswith('features:'):
-                            current_section = features_lines
-                            line = re.sub(r'^Features:?\s*', '', line, flags=re.IGNORECASE)
-                        elif lower_line.startswith('benefits:'):
-                            current_section = benefits_lines
-                            line = re.sub(r'^Benefits:?\s*', '', line, flags=re.IGNORECASE)
-                        elif lower_line.startswith('description:'):
-                            current_section = description_lines
-                            line = re.sub(r'^Description:?\s*', '', line, flags=re.IGNORECASE)
-                        current_section.append(line)
-                    
-                    if module_name:
-                        return {
-                            'name': module_name,
-                            'description': ' '.join(description_lines),
-                            'features': features_lines,
-                            'benefits': benefits_lines
-                        }
-                    return None
-                except Exception as e:
-                    logger.error(f"Error processing module section: {str(e)}")
-                    return None
-            
-            futures = [executor.submit(process_section, section.group(1).strip()) 
-                      for section in sections]
+            futures = []
+            for section in sections:
+                futures.append(executor.submit(parse_section, section.group(1).strip()))
             
             for future in futures:
                 try:
-                    result = future.result(timeout=5)  # 5 second timeout for processing
+                    result = future.result(timeout=5)
                     if result:
                         modules.append(result)
                 except TimeoutError:
@@ -201,114 +233,45 @@ def parse_module_response(content: str) -> List[Dict[str, str]]:
         return modules
         
     except Exception as e:
-        logger.error(f"Error parsing module response: {str(e)}")
+        logger.error(f"Error parsing module response: {str(e)}", exc_info=True)
         return []
 
-def get_module_recommendations(
-    requirements: str = "",
-    industry: str = "",
-    features: Optional[List[str]] = None,
-    preferred_edition: str = "community",
-    has_experience: str = "no"
-) -> Dict[str, Any]:
-    """Get module recommendations using OpenAI API with enhanced caching and optimization."""
+def parse_section(section_text: str) -> Optional[Dict[str, str]]:
+    """Parse a single module section with improved error handling."""
     try:
-        if not OPENAI_API_KEY:
-            logger.error("OpenAI API key is not configured")
-            return {"error": "OpenAI API key is not configured"}
-
-        # Generate cache key based on input parameters
-        cache_key = f"rec_{hash((requirements, industry, str(features), preferred_edition, has_experience))}"
+        lines = [line.strip() for line in section_text.split('\n') if line.strip()]
+        if len(lines) < 2:
+            return None
+            
+        module_name = re.sub(r'^(Module(?: Name)?:?\s*)', '', lines[0], flags=re.IGNORECASE)
+        module_name = module_name.strip()
         
-        # Check cache first
-        cached_result = recommendation_cache.get(cache_key)
-        if cached_result:
-            logger.info("Returning cached recommendations")
-            return cached_result
-
-        # Create detailed context from inputs
-        context_parts = []
-        if industry:
-            context_parts.append(f"Industry: {industry}")
-            context_parts.append("Industry-specific requirements and best practices will be considered.")
+        description_lines = []
+        features_lines = []
+        benefits_lines = []
+        current_section = description_lines
         
-        if features:
-            context_parts.append(f"Required Features: {format_features(features)}")
-            context_parts.append("These features are essential for the business operations.")
+        for line in lines[1:]:
+            lower_line = line.lower()
+            if lower_line.startswith('features:'):
+                current_section = features_lines
+                line = re.sub(r'^Features:?\s*', '', line, flags=re.IGNORECASE)
+            elif lower_line.startswith('benefits:'):
+                current_section = benefits_lines
+                line = re.sub(r'^Benefits:?\s*', '', line, flags=re.IGNORECASE)
+            elif lower_line.startswith('description:'):
+                current_section = description_lines
+                line = re.sub(r'^Description:?\s*', '', line, flags=re.IGNORECASE)
+            current_section.append(line)
         
-        if preferred_edition:
-            edition_context = f"Preferred Edition: {preferred_edition.title()}"
-            if preferred_edition.lower() == "community":
-                edition_context += " (Focus on core features available in the free edition)"
-            else:
-                edition_context += " (Include advanced enterprise features)"
-            context_parts.append(edition_context)
-        
-        experience_level = "Yes" if has_experience == "yes" else "No"
-        context_parts.append(f"Previous Odoo Experience: {experience_level}")
-        if experience_level == "No":
-            context_parts.append("Recommendations should focus on user-friendly modules with good documentation and support.")
-        
-        if requirements:
-            context_parts.append("Additional Requirements:")
-            context_parts.append(requirements)
-
-        context = "\n".join(context_parts)
-        logger.info("Generated enhanced context for recommendation request")
-
-        # Optimized prompt for faster and more focused responses
-        prompt = f'''As an Odoo technical consultant, recommend 4 specific modules that best address these requirements:
-
-Business Context:
-{context}
-
-Format each recommendation as:
-Module: [Name]
-Description: [Core functionality and benefits]
-Features: [Key features]
-Benefits: [Business value]'''
-
-        logger.info("Making OpenAI API request with optimized prompt")
-        response = openai_client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=1500,
-            timeout=30  # Add timeout for API requests
-        )
-
-        if not response or not response.choices:
-            logger.error("Empty or invalid response from OpenAI API")
-            return {"error": "Failed to generate recommendations"}
-
-        content = response.choices[0].message.content
-        if not content:
-            logger.error("Empty content in OpenAI API response")
-            return {"error": "No recommendations generated"}
-
-        # Parse modules with improved handling
-        modules = parse_module_response(content)
-        if not modules:
-            logger.error("No valid modules parsed from response")
-            return {"error": "No valid recommendations found"}
-
-        # Fetch module information in parallel
-        module_names = [module['name'] for module in modules]
-        module_info = asyncio.run(get_modules_info_batch(module_names))
-
-        # Prepare the response with module details
-        result = {
-            'text': content,
-            'modules': modules,
-            'urls': {name: info['url'] for name, info in module_info.items()},
-            'images': {name: info['image'] for name, info in module_info.items()}
-        }
-
-        # Cache the result
-        recommendation_cache.set(cache_key, result, expiry_minutes=60)
-
-        return result
-
+        if module_name:
+            return {
+                'name': module_name,
+                'description': ' '.join(description_lines),
+                'features': features_lines,
+                'benefits': benefits_lines
+            }
+        return None
     except Exception as e:
-        logger.error(f"Error generating recommendations: {str(e)}")
-        return {"error": f"Unable to generate recommendations: {str(e)}"}
+        logger.error(f"Error processing module section: {str(e)}", exc_info=True)
+        return None

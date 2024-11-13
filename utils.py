@@ -1,12 +1,19 @@
 import os
 from openai import OpenAI
-from typing import List, Optional, Dict, Tuple, Any
+from typing import List, Optional, Dict, Tuple, Any, Union
 import requests
 from bs4 import BeautifulSoup
 import json
 import logging
-from typing import Union
 import re
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import time
+from threading import Lock
+from datetime import datetime, timedelta
+import asyncio
+import aiohttp
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -22,20 +29,66 @@ if not OPENAI_API_KEY:
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
+# Enhanced cache configuration
+class CacheEntry:
+    def __init__(self, data: Any, expiry: datetime):
+        self.data = data
+        self.expiry = expiry
+        self.last_accessed = datetime.now()
+        self.access_count = 0
+
+class Cache:
+    def __init__(self, max_size: int = 1000):
+        self.data = {}
+        self.max_size = max_size
+        self.lock = Lock()
+        
+    def get(self, key: str) -> Optional[Any]:
+        with self.lock:
+            if key in self.data:
+                entry = self.data[key]
+                if datetime.now() < entry.expiry:
+                    entry.last_accessed = datetime.now()
+                    entry.access_count += 1
+                    return entry.data
+                else:
+                    del self.data[key]
+            return None
+            
+    def set(self, key: str, value: Any, expiry_minutes: int = 60):
+        with self.lock:
+            if len(self.data) >= self.max_size:
+                # Remove least recently used items
+                sorted_items = sorted(
+                    self.data.items(),
+                    key=lambda x: (x[1].last_accessed, -x[1].access_count)
+                )
+                for old_key, _ in sorted_items[:int(self.max_size * 0.2)]:
+                    del self.data[old_key]
+                    
+            self.data[key] = CacheEntry(
+                value,
+                datetime.now() + timedelta(minutes=expiry_minutes)
+            )
+
+# Initialize caches with different expiration times
+module_cache = Cache(max_size=1000)  # Cache for module information
+recommendation_cache = Cache(max_size=500)  # Cache for recommendations
+
 def format_features(features: Optional[List[str]]) -> str:
     """Format features list into a readable string."""
     if not features:
         return "No specific features selected"
     return ", ".join(features)
 
-def get_module_info(module_name: str) -> Tuple[str, str]:
-    """Get module URL and generate an image for the module."""
-    base_url = "https://apps.odoo.com/apps/modules"
-    search_query = module_name.lower().replace(" ", "-")
-    url = f"{base_url}/browse?search={search_query}"
-    
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
+)
+async def fetch_module_info(session: aiohttp.ClientSession, module_name: str) -> Dict[str, str]:
+    """Asynchronously fetch module information."""
     try:
-        # Generate DALL-E image for the module with improved prompt
+        # Generate DALL-E image with improved prompt
         prompt = f"""Create a professional, minimalist icon for an Odoo {module_name} module.
         Style: Modern, corporate, clean design
         Colors: Use purple and white as primary colors
@@ -43,17 +96,40 @@ def get_module_info(module_name: str) -> Tuple[str, str]:
         Theme: Professional enterprise software
         No text or words in the image"""
         
-        response = openai_client.images.generate(
+        response = await openai_client.images.generate(
             prompt=prompt,
             size="256x256",
             quality="standard",
             n=1,
         )
+        
         image_url = response.data[0].url
-        return url, image_url
+        module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
+        
+        return {
+            'url': module_url,
+            'image': image_url
+        }
     except Exception as e:
-        logger.error(f"Error generating image for {module_name}: {str(e)}")
-        return url, "/static/images/default_module_icon.svg"
+        logger.error(f"Error fetching module info for {module_name}: {str(e)}")
+        return {
+            'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
+            'image': "/static/images/default_module_icon.svg"
+        }
+
+async def get_modules_info_batch(modules: List[str]) -> Dict[str, Dict[str, str]]:
+    """Fetch module information in parallel using asyncio."""
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_module_info(session, module) for module in modules]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        return {
+            module: result if not isinstance(result, Exception) else {
+                'url': f"https://apps.odoo.com/apps/modules/browse?search={module.lower().replace(' ', '-')}",
+                'image': "/static/images/default_module_icon.svg"
+            }
+            for module, result in zip(modules, results)
+        }
 
 def parse_module_response(content: str) -> List[Dict[str, str]]:
     """Parse the OpenAI response content into structured module data with improved parsing."""
@@ -63,39 +139,65 @@ def parse_module_response(content: str) -> List[Dict[str, str]]:
         
     modules = []
     try:
-        # Split content into module sections
         pattern = r'(?:^|\n\n)(?:\d+\.|Module:)\s*(.*?)(?=(?:\n\n(?:\d+\.|Module:)|$))'
-        sections = re.finditer(pattern, content, re.DOTALL)
+        sections = list(re.finditer(pattern, content, re.DOTALL))
         
-        for section in sections:
-            section_text = section.group(1).strip()
-            lines = [line.strip() for line in section_text.split('\n') if line.strip()]
+        if not sections:
+            return []
             
-            if len(lines) < 2:
-                continue
+        # Process all sections in parallel
+        with ThreadPoolExecutor(max_workers=min(4, len(sections))) as executor:
+            def process_section(section_text: str) -> Optional[Dict[str, str]]:
+                try:
+                    lines = [line.strip() for line in section_text.split('\n') if line.strip()]
+                    if len(lines) < 2:
+                        return None
+                        
+                    module_name = re.sub(r'^(Module(?: Name)?:?\s*)', '', lines[0], flags=re.IGNORECASE)
+                    module_name = module_name.strip()
+                    
+                    description_lines = []
+                    features_lines = []
+                    benefits_lines = []
+                    current_section = description_lines
+                    
+                    for line in lines[1:]:
+                        lower_line = line.lower()
+                        if lower_line.startswith('features:'):
+                            current_section = features_lines
+                            line = re.sub(r'^Features:?\s*', '', line, flags=re.IGNORECASE)
+                        elif lower_line.startswith('benefits:'):
+                            current_section = benefits_lines
+                            line = re.sub(r'^Benefits:?\s*', '', line, flags=re.IGNORECASE)
+                        elif lower_line.startswith('description:'):
+                            current_section = description_lines
+                            line = re.sub(r'^Description:?\s*', '', line, flags=re.IGNORECASE)
+                        current_section.append(line)
+                    
+                    if module_name:
+                        return {
+                            'name': module_name,
+                            'description': ' '.join(description_lines),
+                            'features': features_lines,
+                            'benefits': benefits_lines
+                        }
+                    return None
+                except Exception as e:
+                    logger.error(f"Error processing module section: {str(e)}")
+                    return None
             
-            # Extract module name and clean it
-            module_name = re.sub(r'^(Module(?: Name)?:?\s*)', '', lines[0], flags=re.IGNORECASE)
-            module_name = module_name.strip()
+            futures = [executor.submit(process_section, section.group(1).strip()) 
+                      for section in sections]
             
-            # Extract description
-            description_lines = []
-            for line in lines[1:]:
-                if line.lower().startswith(('description:', 'features:', 'benefits:')):
-                    line = re.sub(r'^(Description|Features|Benefits):?\s*', '', line, flags=re.IGNORECASE)
-                description_lines.append(line)
-            
-            description = ' '.join(description_lines)
-            
-            if module_name and description:
-                url, image = get_module_info(module_name)
-                modules.append({
-                    'name': module_name,
-                    'description': description,
-                    'url': url,
-                    'image': image
-                })
-        
+            for future in futures:
+                try:
+                    result = future.result(timeout=5)  # 5 second timeout for processing
+                    if result:
+                        modules.append(result)
+                except TimeoutError:
+                    logger.error("Timeout processing module section")
+                    continue
+                    
         return modules
         
     except Exception as e:
@@ -109,11 +211,20 @@ def get_module_recommendations(
     preferred_edition: str = "community",
     has_experience: str = "no"
 ) -> Dict[str, Any]:
-    """Get module recommendations using OpenAI API with enhanced context and improved response handling."""
+    """Get module recommendations using OpenAI API with enhanced caching and optimization."""
     try:
         if not OPENAI_API_KEY:
             logger.error("OpenAI API key is not configured")
             return {"error": "OpenAI API key is not configured"}
+
+        # Generate cache key based on input parameters
+        cache_key = f"rec_{hash((requirements, industry, str(features), preferred_edition, has_experience))}"
+        
+        # Check cache first
+        cached_result = recommendation_cache.get(cache_key)
+        if cached_result:
+            logger.info("Returning cached recommendations")
+            return cached_result
 
         # Create detailed context from inputs
         context_parts = []
@@ -145,38 +256,25 @@ def get_module_recommendations(
         context = "\n".join(context_parts)
         logger.info("Generated enhanced context for recommendation request")
 
-        prompt = f'''As an experienced Odoo technical consultant, recommend 4 specific Odoo modules that best address the following business requirements. Focus on practical implementation and value delivery.
-
-For each module provide:
-1. Module Name (exact name as shown in Odoo Apps store)
-2. Brief description including:
-   - Core purpose and main functionality
-   - Key benefits for the business
-   - Integration capabilities
-   - Ease of implementation considering the user's experience level
+        # Optimized prompt for faster and more focused responses
+        prompt = f'''As an Odoo technical consultant, recommend 4 specific modules that best address these requirements:
 
 Business Context:
 {context}
 
-Guidelines:
-- Recommend official Odoo modules when possible
-- Consider the user's experience level when suggesting complex modules
-- Focus on modules that integrate well with each other
-- Prioritize stable, well-maintained modules
-- Suggest modules that align with the preferred edition (Community/Enterprise)
-
 Format each recommendation as:
-Module: [Exact Module Name]
+Module: [Name]
 Description: [Core functionality and benefits]
-Features: [Key features and integration points]
-Benefits: [Business value and implementation considerations]'''
+Features: [Key features]
+Benefits: [Business value]'''
 
-        logger.info("Making OpenAI API request with enhanced prompt")
+        logger.info("Making OpenAI API request with optimized prompt")
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,  # Reduced for more consistent responses
-            max_tokens=1500   # Increased for more detailed responses
+            temperature=0.2,
+            max_tokens=1500,
+            timeout=30  # Add timeout for API requests
         )
 
         if not response or not response.choices:
@@ -194,16 +292,22 @@ Benefits: [Business value and implementation considerations]'''
             logger.error("No valid modules parsed from response")
             return {"error": "No valid recommendations found"}
 
-        # Prepare the response with module details
-        urls = {module['name']: module['url'] for module in modules if module['url']}
-        images = {module['name']: module['image'] for module in modules if module['image']}
+        # Fetch module information in parallel
+        module_names = [module['name'] for module in modules]
+        module_info = asyncio.run(get_modules_info_batch(module_names))
 
-        return {
+        # Prepare the response with module details
+        result = {
             'text': content,
             'modules': modules,
-            'urls': urls,
-            'images': images
+            'urls': {name: info['url'] for name, info in module_info.items()},
+            'images': {name: info['image'] for name, info in module_info.items()}
         }
+
+        # Cache the result
+        recommendation_cache.set(cache_key, result, expiry_minutes=60)
+
+        return result
 
     except Exception as e:
         logger.error(f"Error generating recommendations: {str(e)}")

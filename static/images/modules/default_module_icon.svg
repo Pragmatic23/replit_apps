@@ -2,4 +2,9 @@
   <rect width="256" height="256" fill="#4A148C" rx="32"/>
   <path d="M128 64a64 64 0 1 0 64 64 64 64 0 0 0-64-64zm0 96a32 32 0 1 1 32-32 32 32 0 0 1-32 32z" fill="#E1BEE7"/>
   <path d="M192 176v16H64v-16a64 64 0 0 1 128 0z" fill="#E1BEE7"/>
+  <g id="edition-indicator" transform="translate(180, 20)">
+    <circle cx="32" cy="32" r="24" fill="#FFD700" stroke="#4A148C" stroke-width="4"/>
+    <text x="32" y="32" text-anchor="middle" dominant-baseline="middle" 
+          font-family="Arial" font-weight="bold" font-size="24" fill="#4A148C">E</text>
+  </g>
 </svg>

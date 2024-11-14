@@ -24,6 +24,11 @@
                 {% for module in recommendations.modules %}
                     <div class="col-md-6 recommendation-item" data-module-index="{{ loop.index0 }}">
                         <div class="card h-100 module-card">
+                            <!-- Edition Badge -->
+                            <div class="edition-badge {{ module.edition|lower }}">
+                                {{ module.edition }}
+                            </div>
+                            
                             <div class="module-image-container">
                                 {% if module.image %}
                                     <img data-src="{{ module.image }}" 
@@ -44,7 +49,12 @@
                                     <div class="skeleton-line"></div>
                                 </div>
                                 <div class="content-actual" style="display: none;">
-                                    <h3 class="module-title">{{ module.name }}</h3>
+                                    <h3 class="module-title">
+                                        {{ module.name }}
+                                        {% if module.edition|lower == 'enterprise' %}
+                                            <i class="fas fa-star text-warning" title="Enterprise Module"></i>
+                                        {% endif %}
+                                    </h3>
                                     <p class="module-description">{{ module.description }}</p>
                                     {% if module.features %}
                                     <div class="module-features mt-3">
@@ -52,6 +62,16 @@
                                         <ul class="list-unstyled">
                                             {% for feature in module.features %}
                                                 <li><i class="fas fa-check text-success me-2"></i>{{ feature }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    {% if module.benefits %}
+                                    <div class="module-benefits mt-3">
+                                        <h4 class="h6">Benefits:</h4>
+                                        <ul class="list-unstyled">
+                                            {% for benefit in module.benefits %}
+                                                <li><i class="fas fa-plus-circle text-primary me-2"></i>{{ benefit }}</li>
                                             {% endfor %}
                                         </ul>
                                     </div>
@@ -96,7 +116,6 @@
     </main>
 </div>
 
-<!-- Add JavaScript for lazy loading and progressive loading -->
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {

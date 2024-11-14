@@ -33,22 +33,36 @@ openai_client = OpenAI(
 
 # Optimized system prompt for better token usage
 SYSTEM_PROMPT = """You are an Odoo module expert. Recommend modules based on business requirements.
-Focus on essential features and direct benefits. Be concise and specific."""
+Focus on essential features, direct benefits, and specify edition requirements (Community/Enterprise). Be concise and specific."""
 
-def get_module_icon(module_name: str) -> Dict[str, str]:
+def get_module_icon(module_name: str, edition: str = "community") -> Dict[str, str]:
     """Get static module icon path with fallback to default."""
     module_slug = module_name.lower().replace(' ', '_')
-    icon_path = f"/static/images/modules/{module_slug}.svg"
-    default_icon = "/static/images/modules/default_module_icon.svg"
+    edition_slug = edition.lower()
     
+    # Check for edition-specific icon first
+    icon_path = f"/static/images/modules/{module_slug}_{edition_slug}.svg"
     if os.path.exists(f".{icon_path}"):
         return {
             'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
-            'image': icon_path
+            'image': icon_path,
+            'edition': edition
         }
+    
+    # Fallback to generic module icon
+    icon_path = f"/static/images/modules/{module_slug}.svg"
+    if os.path.exists(f".{icon_path}"):
+        return {
+            'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
+            'image': icon_path,
+            'edition': edition
+        }
+    
+    # Use default icon
     return {
         'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
-        'image': default_icon
+        'image': "/static/images/modules/default_module_icon.svg",
+        'edition': edition
     }
 
 @retry(
@@ -140,7 +154,7 @@ Benefits: [Business value]'''
             return {"error": "No valid recommendations found"}
 
         # Optimize module info collection with dictionary comprehension
-        module_info = {module['name']: get_module_icon(module['name']) for module in modules}
+        module_info = {module['name']: get_module_icon(module['name'], preferred_edition) for module in modules}
 
         return {
             'text': content,

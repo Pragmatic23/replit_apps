@@ -38,7 +38,7 @@ Focus on essential features, direct benefits, and specify edition requirements (
 def get_module_icon(module_name: str, edition: str = "community") -> Dict[str, str]:
     """Get static module icon path with fallback to default."""
     module_slug = module_name.lower().replace(' ', '_')
-    edition_slug = edition.lower()
+    edition_slug = (edition or "community").lower()  # Handle None case with default to community
     
     # Check for edition-specific icon first
     icon_path = f"/static/images/modules/{module_slug}_{edition_slug}.svg"
@@ -46,7 +46,7 @@ def get_module_icon(module_name: str, edition: str = "community") -> Dict[str, s
         return {
             'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
             'image': icon_path,
-            'edition': edition
+            'edition': edition_slug
         }
     
     # Fallback to generic module icon
@@ -55,14 +55,14 @@ def get_module_icon(module_name: str, edition: str = "community") -> Dict[str, s
         return {
             'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
             'image': icon_path,
-            'edition': edition
+            'edition': edition_slug
         }
     
     # Use default icon
     return {
         'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
         'image': "/static/images/modules/default_module_icon.svg",
-        'edition': edition
+        'edition': edition_slug
     }
 
 @retry(
@@ -107,6 +107,9 @@ def get_module_recommendations(
         # Input validation
         if not requirements.strip():
             return {"error": "Requirements cannot be empty"}
+
+        # Ensure preferred_edition has a default value
+        preferred_edition = preferred_edition or "community"
         
         # Optimize context generation with list comprehension
         context_parts = [
@@ -156,11 +159,14 @@ Benefits: [Business value]'''
         # Optimize module info collection with dictionary comprehension
         module_info = {module['name']: get_module_icon(module['name'], preferred_edition) for module in modules}
 
+        for module in modules:
+            module['edition'] = module_info[module['name']]['edition']
+            module['url'] = module_info[module['name']]['url']
+            module['image'] = module_info[module['name']]['image']
+
         return {
             'text': content,
-            'modules': modules,
-            'urls': {name: info['url'] for name, info in module_info.items()},
-            'images': {name: info['image'] for name, info in module_info.items()}
+            'modules': modules
         }
 
     except Exception as e:

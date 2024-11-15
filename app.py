@@ -1,5 +1,6 @@
 import os
-from flask import Flask
+import time
+from flask import Flask, request
 from extensions import db, login_manager
 from models import User, Recommendation, UserSession
 from flask_compress import Compress
@@ -8,6 +9,7 @@ from flask_limiter.util import get_remote_address
 import redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 import logging
+from icon_cache import icon_cache
 
 logger = logging.getLogger(__name__)
 
@@ -17,28 +19,42 @@ def create_app():
     # Enable compression
     Compress(app)
     
-    # Configure Redis with fallback
-    try:
-        redis_client = redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379"))
-        redis_client.ping()  # Test connection
-        
-        # Configure rate limiting with Redis
-        limiter = Limiter(
-            app=app,
-            key_func=get_remote_address,
-            default_limits=["200 per day", "50 per hour"],
-            storage_uri=os.environ.get("REDIS_URL", "redis://localhost:6379")
-        )
-        logger.info("Rate limiting enabled with Redis storage")
-    except RedisConnectionError:
-        # Fallback to in-memory storage if Redis is not available
+    # Configure Redis with fallback and retry
+    redis_client = None
+    redis_connected = False
+    
+    for _ in range(3):  # Try 3 times
+        try:
+            redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")
+            redis_client = redis.from_url(redis_url)
+            redis_client.ping()
+            redis_connected = True
+            
+            # Initialize icon cache with Redis
+            icon_cache.initialize_redis()
+            
+            # Configure rate limiting with Redis
+            limiter = Limiter(
+                app=app,
+                key_func=get_remote_address,
+                default_limits=["200 per day", "50 per hour"],
+                storage_uri=redis_url
+            )
+            logger.info("Rate limiting and icon caching enabled with Redis storage")
+            break
+        except (RedisConnectionError, OSError) as e:
+            logger.warning(f"Redis connection attempt failed: {str(e)}")
+            time.sleep(1)
+    
+    if not redis_connected:
+        logger.warning("Redis unavailable after retries. Using in-memory storage for rate limiting")
+        # Fallback to in-memory storage
         limiter = Limiter(
             app=app,
             key_func=get_remote_address,
             default_limits=["200 per day", "50 per hour"],
             storage_uri="memory://"
         )
-        logger.warning("Redis unavailable. Using in-memory storage for rate limiting")
     
     app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "odoo-recommender-secret-key"
     
@@ -54,9 +70,17 @@ def create_app():
         "max_identifier_length": 63
     }
     
-    # Additional performance configurations
-    app.config['TEMPLATES_AUTO_RELOAD'] = False
+    # Configure caching headers for static files
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # Cache static files for 1 year
+    app.config['STATIC_FOLDER'] = 'static'
+    
+    @app.after_request
+    def add_cache_headers(response):
+        if 'static' in request.path:
+            # Cache static files (including icons) for 1 hour
+            response.cache_control.max_age = 3600
+            response.cache_control.public = True
+        return response
     
     # Initialize extensions
     db.init_app(app)
@@ -64,7 +88,6 @@ def create_app():
     
     @login_manager.user_loader
     def load_user(user_id):
-        # Use Session.get() instead of Query.get()
         return db.session.get(User, int(user_id))
     
     # Import and register routes

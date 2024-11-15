@@ -159,6 +159,7 @@ Benefits: [Business value]'''
         # Optimize module info collection with dictionary comprehension
         module_info = {module['name']: get_module_icon(module['name'], preferred_edition) for module in modules}
 
+        # Update modules with icon information
         for module in modules:
             module['edition'] = module_info[module['name']]['edition']
             module['url'] = module_info[module['name']]['url']
@@ -166,7 +167,9 @@ Benefits: [Business value]'''
 
         return {
             'text': content,
-            'modules': modules
+            'modules': modules,
+            'urls': {m['name']: m['url'] for m in modules},
+            'images': {m['name']: m['image'] for m in modules}
         }
 
     except Exception as e:

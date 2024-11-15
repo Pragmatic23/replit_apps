@@ -15,6 +15,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const editionVersionContainer = document.getElementById('edition-version-container');
         const experienceRadios = recommendationsForm.querySelectorAll('input[name="has_odoo_experience"]');
         
+        // Add form submission handler
+        recommendationsForm.addEventListener('submit', function() {
+            const button = this.querySelector('button[type="submit"]');
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
+            button.disabled = true;
+            debug('Form submitted - loading state activated');
+        });
+        
         if (editionVersionContainer && experienceRadios.length) {
             debug('Form elements found - initializing conditional logic');
             

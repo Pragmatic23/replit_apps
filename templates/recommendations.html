@@ -17,17 +17,13 @@
                     <div class="col-md-6 recommendation-item" data-module-index="{{ loop.index0 }}">
                         <div class="card h-100 module-card">
                             <div class="module-image-container">
-                                {% if module.image %}
-                                    <img data-src="{{ module.image }}" 
-                                         alt="{{ module.name }}" 
-                                         class="module-image lazy"
-                                         loading="lazy"
-                                         src="/static/images/placeholder.svg">
-                                {% else %}
-                                    <div class="module-image-placeholder">
-                                        <i class="fas fa-cube fa-3x text-primary"></i>
-                                    </div>
-                                {% endif %}
+                                {% set module_image = recommendations.images.get(module.name, '/static/images/default_module_icon.svg') %}
+                                <img data-src="{{ module_image }}" 
+                                     alt="{{ module.name }}" 
+                                     class="module-image lazy"
+                                     loading="lazy"
+                                     src="/static/images/placeholder.svg"
+                                     onerror="this.onerror=null; this.src='/static/images/default_module_icon.svg';">
                             </div>
                             <div class="card-body">
                                 <h3 class="module-title">{{ module.name }}</h3>
@@ -42,8 +38,8 @@
                                     </ul>
                                 </div>
                                 {% endif %}
-                                {% if module.url %}
-                                    <a href="{{ module.url }}" 
+                                {% if recommendations.urls.get(module.name) %}
+                                    <a href="{{ recommendations.urls.get(module.name) }}" 
                                        target="_blank" 
                                        class="btn btn-outline-primary mt-2"
                                        rel="noopener">
@@ -85,7 +81,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Lazy loading for images
+    // Lazy loading for images with error handling
     const lazyImages = document.querySelectorAll('img.lazy');
     
     const imageObserver = new IntersectionObserver((entries, observer) => {
@@ -99,7 +95,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    lazyImages.forEach(img => imageObserver.observe(img));
+    lazyImages.forEach(img => {
+        // Add error handling for each image
+        img.addEventListener('error', function() {
+            this.src = '/static/images/default_module_icon.svg';
+            this.classList.add('error');
+        });
+        imageObserver.observe(img);
+    });
 
     // Progressive loading of recommendation cards
     const recommendationItems = document.querySelectorAll('.recommendation-item');
@@ -155,12 +158,18 @@ document.addEventListener('DOMContentLoaded', function() {
     opacity: 0.5;
 }
 
-.module-image-placeholder {
+.module-image.error {
+    opacity: 0.7;
+    filter: grayscale(0.5);
+}
+
+.module-image-container {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 200px;
     background-color: var(--bs-gray-100);
+    overflow: hidden;
 }
 
 #loading-indicator {

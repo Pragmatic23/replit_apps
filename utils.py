@@ -44,30 +44,43 @@ queue_lock = threading.Lock()
 queue_active = True
 queue_event = threading.Event()
 
-def get_odoo_icon_url(module_name: str) -> str:
-    """Get the official Odoo icon URL for a module."""
-    # Convert module name to URL-friendly format
-    module_slug = module_name.lower().replace(' ', '-')
-    
+def normalize_module_name(module_name: str) -> str:
+    """Normalize module name for icon matching."""
+    return module_name.lower().replace(' ', '_').replace('-', '_')
+
+def get_local_icon_path(module_name: str) -> str:
+    """Get the local icon path for a module."""
     # Default icon path if module-specific icon is not found
     default_icon = "/static/images/default_module_icon.svg"
     
     try:
-        # Construct the Odoo apps URL
-        odoo_url = f"https://apps.odoo.com/apps/modules/browse?search={module_slug}"
+        # Normalize the module name for matching
+        normalized_name = normalize_module_name(module_name)
+        icons_dir = "Images for Odoo Apps recomendor"
         
-        # Try to fetch the module page
-        response = requests.get(odoo_url, timeout=5)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            # Look for the module icon
-            icon_img = soup.find('img', {'class': 'o_app_icon'})
-            if icon_img and icon_img.get('src'):
-                return icon_img['src']
+        # List of possible icon name variations
+        possible_names = [
+            f"{normalized_name}.png",
+            f"{module_name.lower()}.png",
+            f"{module_name}.png"
+        ]
+        
+        # Check for exact matches first
+        for icon_name in possible_names:
+            icon_path = os.path.join(icons_dir, icon_name)
+            if os.path.exists(icon_path):
+                return f"/static/module_icons/{icon_name}"
+        
+        # If no exact match, try fuzzy matching
+        for icon_file in os.listdir(icons_dir):
+            if icon_file.lower().endswith('.png'):
+                base_name = os.path.splitext(icon_file)[0].lower()
+                if normalized_name in base_name or base_name in normalized_name:
+                    return f"/static/module_icons/{icon_file}"
         
         return default_icon
     except Exception as e:
-        logger.error(f"Error fetching Odoo icon for {module_name}: {str(e)}", exc_info=True)
+        logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
         return default_icon
 
 def process_image_queue():
@@ -81,12 +94,12 @@ def process_image_queue():
                 break
                 
             module_name, callback = task
-            image_url = get_odoo_icon_url(module_name)
+            image_path = get_local_icon_path(module_name)
             module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
             
             info = {
                 'url': module_url,
-                'image': image_url
+                'image': image_path
             }
             
             if callback:

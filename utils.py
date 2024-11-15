@@ -9,7 +9,7 @@ import re
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import time
-from threading import Lock
+from threading import Lock, Event
 from datetime import datetime, timedelta
 import asyncio
 import aiohttp
@@ -38,64 +38,74 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 SYSTEM_PROMPT = """You are an Odoo module expert. Recommend modules based on business requirements.
 Focus on essential features and direct benefits. Be concise and specific."""
 
-# Image generation queue with size limit
+# Image queue with better error handling and synchronization
 image_queue = queue.Queue(maxsize=100)
+queue_lock = threading.Lock()
+queue_active = True
+queue_event = threading.Event()
+
+def get_odoo_icon_url(module_name: str) -> str:
+    """Get the official Odoo icon URL for a module."""
+    # Convert module name to URL-friendly format
+    module_slug = module_name.lower().replace(' ', '-')
+    
+    # Default icon path if module-specific icon is not found
+    default_icon = "/static/images/default_module_icon.svg"
+    
+    try:
+        # Construct the Odoo apps URL
+        odoo_url = f"https://apps.odoo.com/apps/modules/browse?search={module_slug}"
+        
+        # Try to fetch the module page
+        response = requests.get(odoo_url, timeout=5)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Look for the module icon
+            icon_img = soup.find('img', {'class': 'o_app_icon'})
+            if icon_img and icon_img.get('src'):
+                return icon_img['src']
+        
+        return default_icon
+    except Exception as e:
+        logger.error(f"Error fetching Odoo icon for {module_name}: {str(e)}", exc_info=True)
+        return default_icon
 
 def process_image_queue():
-    """Background thread for processing image generation requests with improved error handling."""
-    while True:
+    """Background thread for processing image queue with improved error handling."""
+    global queue_active
+    while queue_active:
         try:
-            task = image_queue.get(timeout=60)  # 1-minute timeout
+            # Use timeout to prevent infinite blocking
+            task = image_queue.get(timeout=60)
             if task is None:
                 break
                 
             module_name, callback = task
-            image_info = generate_module_image(module_name)
+            image_url = get_odoo_icon_url(module_name)
+            module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
+            
+            info = {
+                'url': module_url,
+                'image': image_url
+            }
+            
             if callback:
-                callback(image_info)
-                
+                callback(info)
+            
+            # Signal that we've processed a task
+            queue_event.set()
+            
         except queue.Empty:
+            # Expected timeout, continue waiting
             continue
         except Exception as e:
             logger.error(f"Error processing image queue: {str(e)}", exc_info=True)
         finally:
-            image_queue.task_done()
-
-# Start image processing thread
-image_thread = threading.Thread(target=process_image_queue, daemon=True)
-image_thread.start()
-
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type((TimeoutError, ConnectionError))
-)
-def generate_module_image(module_name: str) -> Dict[str, str]:
-    """Generate module image using DALL-E with optimized prompt."""
-    try:
-        # Shorter, more focused prompt for token efficiency
-        prompt = f"Minimal icon for Odoo {module_name} module. Modern business style, purple theme."
-        
-        response = openai_client.images.generate(
-            prompt=prompt,
-            size="256x256",
-            quality="standard",
-            n=1,
-        )
-        
-        image_url = response.data[0].url
-        module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
-        
-        return {
-            'url': module_url,
-            'image': image_url
-        }
-    except Exception as e:
-        logger.error(f"Error generating image for {module_name}: {str(e)}", exc_info=True)
-        return {
-            'url': f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}",
-            'image': "/static/images/default_module_icon.svg"
-        }
+            try:
+                image_queue.task_done()
+            except ValueError:
+                # Handle case where task_done is called too many times
+                logger.warning("Queue task_done called too many times, ignoring")
 
 def stream_openai_response(prompt: str) -> Generator[str, None, None]:
     """Stream OpenAI API response with improved error handling."""
@@ -109,7 +119,7 @@ def stream_openai_response(prompt: str) -> Generator[str, None, None]:
             model="gpt-4",
             messages=messages,
             temperature=0.2,
-            max_tokens=1000,  # Reduced for efficiency
+            max_tokens=1000,
             stream=True
         )
         
@@ -136,7 +146,6 @@ def get_module_recommendations(
             logger.error("OpenAI API key is not configured")
             return {"error": "OpenAI API key is not configured"}
 
-        # Optimize context generation with list comprehension
         context_parts = [
             f"Industry: {industry}" if industry else None,
             f"Features: {', '.join(features)}" if features else None,
@@ -145,10 +154,7 @@ def get_module_recommendations(
             f"Requirements: {requirements}" if requirements else None
         ]
         
-        # Filter out None values and join
         context = "\n".join(filter(None, context_parts))
-
-        # Optimized prompt for reduced token usage
         prompt = f'''Recommend 4 Odoo modules for:\n{context}\n\nFormat:\nModule: [Name]\nDescription: [Core functionality]\nFeatures: [Key features]\nBenefits: [Value]'''
 
         if stream:
@@ -157,7 +163,6 @@ def get_module_recommendations(
                 content_type='text/event-stream'
             )
 
-        # Non-streaming response with retry
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
@@ -172,12 +177,13 @@ def get_module_recommendations(
         if not content:
             return {"error": "No recommendations generated"}
 
-        # Parse modules with improved error handling
         modules = parse_module_response(content)
         if not modules:
             return {"error": "No valid recommendations found"}
 
-        # Queue image generation with timeout handling
+        # Reset queue event before processing new batch
+        queue_event.clear()
+        
         module_info = {}
         for module in modules:
             try:
@@ -187,6 +193,9 @@ def get_module_recommendations(
                 )
             except queue.Full:
                 logger.warning(f"Image generation queue full, skipping image for {module['name']}")
+
+        # Wait for all tasks to be processed with a timeout
+        queue_event.wait(timeout=10)
 
         result = {
             'text': content,
@@ -215,7 +224,6 @@ def parse_module_response(content: str) -> List[Dict[str, str]]:
         if not sections:
             return []
             
-        # Process sections with optimized thread pool
         with ThreadPoolExecutor(max_workers=min(4, len(sections))) as executor:
             futures = []
             for section in sections:
@@ -275,3 +283,7 @@ def parse_section(section_text: str) -> Optional[Dict[str, str]]:
     except Exception as e:
         logger.error(f"Error processing module section: {str(e)}", exc_info=True)
         return None
+
+# Start image processing thread
+image_thread = threading.Thread(target=process_image_queue, daemon=True)
+image_thread.start()

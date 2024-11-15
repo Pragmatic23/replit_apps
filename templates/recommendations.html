@@ -12,23 +12,10 @@
                 {{ recommendations.error }}
             </div>
         {% else %}
-            <!-- Initial Loading State -->
-            <div id="initial-loading" class="text-center py-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading recommendations...</span>
-                </div>
-                <p class="mt-3">Preparing your recommendations...</p>
-            </div>
-
-            <div class="row g-4" id="recommendations-container" style="display: none;">
+            <div class="row g-4" id="recommendations-container">
                 {% for module in recommendations.modules %}
                     <div class="col-md-6 recommendation-item" data-module-index="{{ loop.index0 }}">
                         <div class="card h-100 module-card">
-                            <!-- Edition Badge -->
-                            <div class="edition-badge {{ module.edition|lower }}">
-                                {{ module.edition }}
-                            </div>
-                            
                             <div class="module-image-container">
                                 {% if module.image %}
                                     <img data-src="{{ module.image }}" 
@@ -43,63 +30,34 @@
                                 {% endif %}
                             </div>
                             <div class="card-body">
-                                <div class="content-skeleton" style="display: block;">
-                                    <div class="skeleton-line"></div>
-                                    <div class="skeleton-line"></div>
-                                    <div class="skeleton-line"></div>
+                                <h3 class="module-title">{{ module.name }}</h3>
+                                <p class="module-description">{{ module.description }}</p>
+                                {% if module.features %}
+                                <div class="module-features mt-3">
+                                    <h4 class="h6">Key Features:</h4>
+                                    <ul class="list-unstyled">
+                                        {% for feature in module.features %}
+                                            <li><i class="fas fa-check text-success me-2"></i>{{ feature }}</li>
+                                        {% endfor %}
+                                    </ul>
                                 </div>
-                                <div class="content-actual" style="display: none;">
-                                    <h3 class="module-title">
-                                        {{ module.name }}
-                                        {% if module.edition|lower == 'enterprise' %}
-                                            <i class="fas fa-star text-warning" title="Enterprise Module"></i>
-                                        {% endif %}
-                                    </h3>
-                                    <p class="module-description">{{ module.description }}</p>
-                                    {% if module.features %}
-                                    <div class="module-features mt-3">
-                                        <h4 class="h6">Key Features:</h4>
-                                        <ul class="list-unstyled">
-                                            {% for feature in module.features %}
-                                                <li><i class="fas fa-check text-success me-2"></i>{{ feature }}</li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
-                                    {% endif %}
-                                    {% if module.benefits %}
-                                    <div class="module-benefits mt-3">
-                                        <h4 class="h6">Benefits:</h4>
-                                        <ul class="list-unstyled">
-                                            {% for benefit in module.benefits %}
-                                                <li><i class="fas fa-plus-circle text-primary me-2"></i>{{ benefit }}</li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
-                                    {% endif %}
-                                    {% if module.url %}
-                                        <a href="{{ module.url }}" 
-                                           target="_blank" 
-                                           class="btn btn-outline-primary mt-2"
-                                           rel="noopener">
-                                            <i class="fas fa-external-link-alt me-2"></i>View in Odoo Apps
-                                        </a>
-                                    {% endif %}
-                                </div>
+                                {% endif %}
+                                {% if module.url %}
+                                    <a href="{{ module.url }}" 
+                                       target="_blank" 
+                                       class="btn btn-outline-primary mt-2"
+                                       rel="noopener">
+                                        <i class="fas fa-external-link-alt me-2"></i>View in Odoo Apps
+                                    </a>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
                 {% endfor %}
             </div>
 
-            <!-- Bottom Loading Indicator -->
-            <div id="loading-indicator" class="text-center mt-4 d-none">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading more...</span>
-                </div>
-            </div>
-
             <!-- Action Buttons -->
-            <div class="text-center mt-4" id="action-buttons" style="display: none;">
+            <div class="text-center mt-4">
                 {% if recommendation_id %}
                     <a href="{{ url_for('export_recommendations', recommendation_id=recommendation_id) }}" 
                        class="btn btn-secondary me-2">
@@ -112,30 +70,24 @@
                     Try Another Search
                 </a>
             </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="text-center mt-4 d-none">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
         {% endif %}
     </main>
 </div>
 
+<!-- Add JavaScript for lazy loading and progressive loading -->
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const initialLoading = document.getElementById('initial-loading');
-    const recommendationsContainer = document.getElementById('recommendations-container');
-    const actionButtons = document.getElementById('action-buttons');
-    const recommendationItems = document.querySelectorAll('.recommendation-item');
-    const batchSize = 2;
-    let currentIndex = 0;
-
-    // Hide initial loading after a minimum display time
-    setTimeout(() => {
-        initialLoading.style.display = 'none';
-        recommendationsContainer.style.display = 'flex';
-        actionButtons.style.display = 'block';
-        showNextBatch();
-    }, 1000);
-
     // Lazy loading for images
     const lazyImages = document.querySelectorAll('img.lazy');
+    
     const imageObserver = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -149,27 +101,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     lazyImages.forEach(img => imageObserver.observe(img));
 
+    // Progressive loading of recommendation cards
+    const recommendationItems = document.querySelectorAll('.recommendation-item');
+    const batchSize = 2;
+    let currentIndex = 0;
+
     function showNextBatch() {
         const end = Math.min(currentIndex + batchSize, recommendationItems.length);
         
         for (let i = currentIndex; i < end; i++) {
-            const item = recommendationItems[i];
-            item.style.opacity = '0';
-            item.style.display = 'block';
-            
-            // Show skeleton loading first
-            const contentSkeleton = item.querySelector('.content-skeleton');
-            const contentActual = item.querySelector('.content-actual');
-            
+            recommendationItems[i].style.opacity = '0';
+            recommendationItems[i].style.display = 'block';
             setTimeout(() => {
-                item.style.transition = 'opacity 0.5s ease-in';
-                item.style.opacity = '1';
-                
-                // After item fades in, switch from skeleton to actual content
-                setTimeout(() => {
-                    if (contentSkeleton) contentSkeleton.style.display = 'none';
-                    if (contentActual) contentActual.style.display = 'block';
-                }, 500);
+                recommendationItems[i].style.transition = 'opacity 0.5s ease-in';
+                recommendationItems[i].style.opacity = '1';
             }, 50 * (i - currentIndex));
         }
 
@@ -177,21 +122,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (currentIndex < recommendationItems.length) {
             document.getElementById('loading-indicator').classList.remove('d-none');
-            setTimeout(showNextBatch, 800);
+            setTimeout(showNextBatch, 500);
         } else {
             document.getElementById('loading-indicator').classList.add('d-none');
         }
     }
 
-    // Initialize ScrollReveal for additional animations
-    if (typeof ScrollReveal !== 'undefined') {
-        ScrollReveal().reveal('.recommendation-item', {
-            delay: 200,
-            distance: '20px',
-            origin: 'bottom',
-            interval: 100
-        });
-    }
+    // Initially hide all items
+    recommendationItems.forEach(item => {
+        item.style.display = 'none';
+    });
+
+    // Start progressive loading
+    showNextBatch();
 });
 </script>
 {% endblock %}
@@ -222,33 +165,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 #loading-indicator {
     padding: 2rem;
-}
-
-/* Skeleton Loading Styles */
-.skeleton-line {
-    height: 15px;
-    margin-bottom: 10px;
-    background: linear-gradient(90deg, var(--bs-gray-200) 25%, var(--bs-gray-300) 50%, var(--bs-gray-200) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 4px;
-}
-
-.skeleton-line:nth-child(2) {
-    width: 90%;
-}
-
-.skeleton-line:nth-child(3) {
-    width: 75%;
-}
-
-@keyframes shimmer {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
-    }
 }
 </style>
 {% endblock %}

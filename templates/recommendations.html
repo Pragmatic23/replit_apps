@@ -66,18 +66,60 @@
                     Try Another Search
                 </a>
             </div>
-
-            <!-- Loading Indicator -->
-            <div id="loading-indicator" class="text-center mt-4 d-none">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
         {% endif %}
     </main>
 </div>
 
-<!-- Add JavaScript for lazy loading and progressive loading -->
+<style>
+/* Updated styles as per requirements */
+.module-image-container {
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bs-dark);
+    padding: 1rem;
+    overflow: hidden;
+}
+
+.module-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+.module-card:hover .module-image {
+    transform: scale(1.05);
+}
+
+.recommendation-item {
+    opacity: 0;
+    transition: opacity 0.5s ease-in;
+}
+
+.module-image.lazy {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.module-image.loaded {
+    opacity: 1;
+}
+
+.module-title {
+    color: var(--bs-primary);
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.module-description {
+    color: var(--bs-light);
+    font-size: 1rem;
+    line-height: 1.6;
+}
+</style>
+
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -96,7 +138,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     lazyImages.forEach(img => {
-        // Add error handling for each image
         img.addEventListener('error', function() {
             this.src = '/static/images/default_module_icon.svg';
             this.classList.add('error');
@@ -124,10 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentIndex = end;
         
         if (currentIndex < recommendationItems.length) {
-            document.getElementById('loading-indicator').classList.remove('d-none');
             setTimeout(showNextBatch, 500);
-        } else {
-            document.getElementById('loading-indicator').classList.add('d-none');
         }
     }
 
@@ -141,39 +179,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-
-<style>
-.recommendation-item {
-    opacity: 0;
-    transition: opacity 0.5s ease-in;
-}
-
-.module-image {
-    max-width: 100%;
-    height: auto;
-    transition: opacity 0.3s ease-in;
-}
-
-.module-image.lazy {
-    opacity: 0.5;
-}
-
-.module-image.error {
-    opacity: 0.7;
-    filter: grayscale(0.5);
-}
-
-.module-image-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 200px;
-    background-color: var(--bs-gray-100);
-    overflow: hidden;
-}
-
-#loading-indicator {
-    padding: 2rem;
-}
-</style>
 {% endblock %}

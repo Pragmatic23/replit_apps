@@ -18,6 +18,7 @@ from cache_utils import cache_with_redis
 from flask import Response, stream_with_context
 import queue
 import threading
+import shutil
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -34,15 +35,31 @@ if not OPENAI_API_KEY:
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Optimized token usage with shorter prompts
-SYSTEM_PROMPT = """You are an Odoo module expert. Recommend modules based on business requirements.
-Focus on essential features and direct benefits. Be concise and specific."""
+# Updated system prompt as per requirements
+SYSTEM_PROMPT = """Assist me in creating a system that accurately recommends Odoo apps based solely on user input and predefined requirements. Use the provided dataset of official Odoo modules and their descriptions to generate responses. Avoid suggesting unrelated or random Odoo modules that are not part of the dataset. Ensure that each recommendation is relevant to the user's input and linked to its correct functionality and description."""
 
-# Image queue with better error handling and synchronization
-image_queue = queue.Queue(maxsize=100)
+# Image queue with improved error handling and synchronization
+image_queue = queue.Queue()
 queue_lock = threading.Lock()
 queue_active = True
 queue_event = threading.Event()
+
+def ensure_module_icons_dir():
+    """Ensure the module_icons directory exists and contains all icons."""
+    source_dir = "Images for Odoo Apps recomendor"
+    target_dir = "static/module_icons"
+    
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+    
+    # Copy all PNG files from source to target
+    if os.path.exists(source_dir):
+        for file in os.listdir(source_dir):
+            if file.lower().endswith('.png'):
+                source_file = os.path.join(source_dir, file)
+                target_file = os.path.join(target_dir, file)
+                if not os.path.exists(target_file):
+                    shutil.copy2(source_file, target_file)
 
 def normalize_module_name(module_name: str) -> str:
     """Normalize module name for icon matching."""
@@ -50,13 +67,16 @@ def normalize_module_name(module_name: str) -> str:
 
 def get_local_icon_path(module_name: str) -> str:
     """Get the local icon path for a module."""
-    # Default icon path if module-specific icon is not found
-    default_icon = "/static/images/default_module_icon.svg"
-    
     try:
+        # Ensure module icons are in place
+        ensure_module_icons_dir()
+        
+        # Default icon path if module-specific icon is not found
+        default_icon = "/static/images/default_module_icon.svg"
+        
         # Normalize the module name for matching
         normalized_name = normalize_module_name(module_name)
-        icons_dir = "Images for Odoo Apps recomendor"
+        icons_dir = "static/module_icons"
         
         # List of possible icon name variations
         possible_names = [
@@ -69,6 +89,7 @@ def get_local_icon_path(module_name: str) -> str:
         for icon_name in possible_names:
             icon_path = os.path.join(icons_dir, icon_name)
             if os.path.exists(icon_path):
+                logger.info(f"Found icon for module {module_name}: {icon_name}")
                 return f"/static/module_icons/{icon_name}"
         
         # If no exact match, try fuzzy matching
@@ -76,9 +97,12 @@ def get_local_icon_path(module_name: str) -> str:
             if icon_file.lower().endswith('.png'):
                 base_name = os.path.splitext(icon_file)[0].lower()
                 if normalized_name in base_name or base_name in normalized_name:
+                    logger.info(f"Found fuzzy match icon for module {module_name}: {icon_file}")
                     return f"/static/module_icons/{icon_file}"
         
+        logger.warning(f"No icon found for module {module_name}, using default")
         return default_icon
+        
     except Exception as e:
         logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
         return default_icon
@@ -86,14 +110,22 @@ def get_local_icon_path(module_name: str) -> str:
 def process_image_queue():
     """Background thread for processing image queue with improved error handling."""
     global queue_active
+    processed_items = set()
+    
     while queue_active:
         try:
             # Use timeout to prevent infinite blocking
-            task = image_queue.get(timeout=60)
+            task = image_queue.get(timeout=1)
             if task is None:
                 break
-                
+            
             module_name, callback = task
+            
+            # Skip if already processed
+            if module_name in processed_items:
+                image_queue.task_done()
+                continue
+                
             image_path = get_local_icon_path(module_name)
             module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
             
@@ -105,20 +137,22 @@ def process_image_queue():
             if callback:
                 callback(info)
             
+            # Add to processed set
+            processed_items.add(module_name)
+            
             # Signal that we've processed a task
             queue_event.set()
+            image_queue.task_done()
             
         except queue.Empty:
             # Expected timeout, continue waiting
             continue
         except Exception as e:
             logger.error(f"Error processing image queue: {str(e)}", exc_info=True)
-        finally:
             try:
                 image_queue.task_done()
             except ValueError:
-                # Handle case where task_done is called too many times
-                logger.warning("Queue task_done called too many times, ignoring")
+                pass
 
 def stream_openai_response(prompt: str) -> Generator[str, None, None]:
     """Stream OpenAI API response with improved error handling."""

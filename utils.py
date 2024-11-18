@@ -9,7 +9,7 @@ import re
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import time
-from threading import Lock, Event
+from threading import Lock, Event, RLock
 from datetime import datetime, timedelta
 import asyncio
 import aiohttp
@@ -40,65 +40,106 @@ SYSTEM_PROMPT = """Assist me in creating a system that accurately recommends Odo
 
 # Image queue with improved error handling and synchronization
 image_queue = queue.Queue()
-queue_lock = threading.Lock()
+queue_lock = RLock()  # Using RLock for recursive locking capability
+processed_items_lock = RLock()
 queue_active = True
-queue_event = threading.Event()
+queue_event = Event()
+
+# Shared state for processed items with thread-safe access
+processed_items = set()
 
 def ensure_module_icons_dir():
     """Ensure the module_icons directory exists and contains all icons."""
     source_dir = "Images for Odoo Apps recomendor"
     target_dir = "static/module_icons"
     
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-    
-    # Copy all PNG files from source to target
-    if os.path.exists(source_dir):
-        for file in os.listdir(source_dir):
-            if file.lower().endswith('.png'):
-                source_file = os.path.join(source_dir, file)
-                target_file = os.path.join(target_dir, file)
-                if not os.path.exists(target_file):
-                    shutil.copy2(source_file, target_file)
+    try:
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir)
+        
+        # Copy all PNG files from source to target
+        if os.path.exists(source_dir):
+            copied_files = 0
+            for file in os.listdir(source_dir):
+                if file.lower().endswith('.png'):
+                    source_file = os.path.join(source_dir, file)
+                    target_file = os.path.join(target_dir, file)
+                    if not os.path.exists(target_file):
+                        shutil.copy2(source_file, target_file)
+                        copied_files += 1
+            logger.info(f"Copied {copied_files} icon files to {target_dir}")
+    except Exception as e:
+        logger.error(f"Error ensuring module icons directory: {str(e)}", exc_info=True)
 
 def normalize_module_name(module_name: str) -> str:
     """Normalize module name for icon matching."""
-    return module_name.lower().replace(' ', '_').replace('-', '_')
+    # Remove common prefixes
+    name = module_name.lower()
+    prefixes = ['odoo_', 'module_', 'app_', 'addon_']
+    for prefix in prefixes:
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+    
+    # Replace special characters
+    name = name.replace(' ', '_').replace('-', '_')
+    logger.debug(f"Normalized module name: {module_name} -> {name}")
+    return name
 
 def get_local_icon_path(module_name: str) -> str:
-    """Get the local icon path for a module."""
+    """Get the local icon path for a module with enhanced matching."""
     try:
         # Ensure module icons are in place
         ensure_module_icons_dir()
         
-        # Default icon path if module-specific icon is not found
+        # Log input module name
+        logger.info(f"Finding icon for module: {module_name}")
+        
+        # Default icon path
         default_icon = "/static/images/default_module_icon.svg"
         
         # Normalize the module name for matching
         normalized_name = normalize_module_name(module_name)
+        logger.info(f"Normalized name for matching: {normalized_name}")
+        
         icons_dir = "static/module_icons"
+        if not os.path.exists(icons_dir):
+            logger.error(f"Icons directory not found: {icons_dir}")
+            return default_icon
         
         # List of possible icon name variations
         possible_names = [
             f"{normalized_name}.png",
             f"{module_name.lower()}.png",
-            f"{module_name}.png"
+            f"{module_name}.png",
+            # Additional variations
+            f"odoo_{normalized_name}.png",
+            f"module_{normalized_name}.png",
+            f"{normalized_name}_icon.png"
         ]
+        
+        # Log all attempted matches
+        logger.info(f"Attempting to match icon names: {possible_names}")
         
         # Check for exact matches first
         for icon_name in possible_names:
             icon_path = os.path.join(icons_dir, icon_name)
             if os.path.exists(icon_path):
-                logger.info(f"Found icon for module {module_name}: {icon_name}")
+                logger.info(f"Found exact match icon for module {module_name}: {icon_name}")
                 return f"/static/module_icons/{icon_name}"
         
         # If no exact match, try fuzzy matching
-        for icon_file in os.listdir(icons_dir):
+        all_icons = os.listdir(icons_dir)
+        logger.info(f"No exact match found. Trying fuzzy matching with {len(all_icons)} icons")
+        
+        for icon_file in all_icons:
             if icon_file.lower().endswith('.png'):
                 base_name = os.path.splitext(icon_file)[0].lower()
-                if normalized_name in base_name or base_name in normalized_name:
-                    logger.info(f"Found fuzzy match icon for module {module_name}: {icon_file}")
-                    return f"/static/module_icons/{icon_file}"
+                # Try matching parts of the name
+                name_parts = normalized_name.split('_')
+                for part in name_parts:
+                    if len(part) > 3 and (part in base_name or base_name in part):
+                        logger.info(f"Found fuzzy match icon for module {module_name}: {icon_file} (matched part: {part})")
+                        return f"/static/module_icons/{icon_file}"
         
         logger.warning(f"No icon found for module {module_name}, using default")
         return default_icon
@@ -110,73 +151,66 @@ def get_local_icon_path(module_name: str) -> str:
 def process_image_queue():
     """Background thread for processing image queue with improved error handling."""
     global queue_active
-    processed_items = set()
+    
+    logger.info("Starting image queue processing thread")
     
     while queue_active:
         try:
-            # Use timeout to prevent infinite blocking
-            task = image_queue.get(timeout=1)
+            # Use increased timeout to prevent premature exits
+            task = image_queue.get(timeout=5)
             if task is None:
+                logger.info("Received shutdown signal in image queue")
                 break
             
             module_name, callback = task
+            logger.info(f"Processing module icon: {module_name}")
             
-            # Skip if already processed
-            if module_name in processed_items:
-                image_queue.task_done()
-                continue
+            # Thread-safe check for already processed items
+            with processed_items_lock:
+                if module_name in processed_items:
+                    logger.info(f"Module {module_name} already processed, skipping")
+                    image_queue.task_done()
+                    continue
+            
+            try:
+                image_path = get_local_icon_path(module_name)
+                module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
                 
-            image_path = get_local_icon_path(module_name)
-            module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
-            
-            info = {
-                'url': module_url,
-                'image': image_path
-            }
-            
-            if callback:
-                callback(info)
-            
-            # Add to processed set
-            processed_items.add(module_name)
-            
-            # Signal that we've processed a task
-            queue_event.set()
-            image_queue.task_done()
+                info = {
+                    'url': module_url,
+                    'image': image_path
+                }
+                
+                if callback:
+                    callback(info)
+                
+                # Thread-safe addition to processed set
+                with processed_items_lock:
+                    processed_items.add(module_name)
+                    logger.info(f"Successfully processed module: {module_name}")
+                
+                # Signal task completion
+                queue_event.set()
+                image_queue.task_done()
+                
+            except Exception as e:
+                logger.error(f"Error processing module {module_name}: {str(e)}", exc_info=True)
+                # Ensure task_done is called even on error
+                image_queue.task_done()
             
         except queue.Empty:
-            # Expected timeout, continue waiting
+            logger.debug("Image queue timeout, continuing to wait")
             continue
         except Exception as e:
-            logger.error(f"Error processing image queue: {str(e)}", exc_info=True)
+            logger.error(f"Error in image queue processing: {str(e)}", exc_info=True)
             try:
                 image_queue.task_done()
             except ValueError:
                 pass
 
-def stream_openai_response(prompt: str) -> Generator[str, None, None]:
-    """Stream OpenAI API response with improved error handling."""
-    try:
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = openai_client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0.2,
-            max_tokens=1000,
-            stream=True
-        )
-        
-        for chunk in response:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
-                
-    except Exception as e:
-        logger.error(f"Error streaming OpenAI response: {str(e)}", exc_info=True)
-        yield json.dumps({"error": str(e)})
+# Start image processing thread
+image_thread = threading.Thread(target=process_image_queue, daemon=True)
+image_thread.start()
 
 @cache_with_redis(expiration=3600)  # Cache for 1 hour
 def get_module_recommendations(
@@ -331,6 +365,26 @@ def parse_section(section_text: str) -> Optional[Dict[str, str]]:
         logger.error(f"Error processing module section: {str(e)}", exc_info=True)
         return None
 
-# Start image processing thread
-image_thread = threading.Thread(target=process_image_queue, daemon=True)
-image_thread.start()
+def stream_openai_response(prompt: str) -> Generator[str, None, None]:
+    """Stream OpenAI API response with improved error handling."""
+    try:
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=messages,
+            temperature=0.2,
+            max_tokens=1000,
+            stream=True
+        )
+        
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+                
+    except Exception as e:
+        logger.error(f"Error streaming OpenAI response: {str(e)}", exc_info=True)
+        yield json.dumps({"error": str(e)})

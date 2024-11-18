@@ -19,6 +19,7 @@ from flask import Response, stream_with_context
 import queue
 import threading
 import shutil
+from pathlib import Path
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -47,29 +48,62 @@ queue_event = Event()
 
 # Shared state for processed items with thread-safe access
 processed_items = set()
+MAX_RETRIES = 3
 
 def ensure_module_icons_dir():
     """Ensure the module_icons directory exists and contains all icons."""
-    source_dir = "Images for Odoo Apps recomendor"
-    target_dir = "static/module_icons"
+    source_dir = Path("Images for Odoo Apps recomendor")
+    target_dir = Path("static/module_icons")
     
     try:
-        if not os.path.exists(target_dir):
-            os.makedirs(target_dir)
+        logger.info(f"Source directory: {source_dir.absolute()}")
+        logger.info(f"Target directory: {target_dir.absolute()}")
         
-        # Copy all PNG files from source to target
-        if os.path.exists(source_dir):
-            copied_files = 0
-            for file in os.listdir(source_dir):
-                if file.lower().endswith('.png'):
-                    source_file = os.path.join(source_dir, file)
-                    target_file = os.path.join(target_dir, file)
-                    if not os.path.exists(target_file):
-                        shutil.copy2(source_file, target_file)
-                        copied_files += 1
-            logger.info(f"Copied {copied_files} icon files to {target_dir}")
+        # Create target directory if it doesn't exist
+        target_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created or verified target directory: {target_dir}")
+        
+        if not source_dir.exists():
+            logger.error(f"Source directory not found: {source_dir}")
+            return
+        
+        # Track file operations
+        copied_files = 0
+        failed_files = 0
+        skipped_files = 0
+        
+        for source_file in source_dir.glob('*.png'):
+            target_file = target_dir / source_file.name
+            try:
+                if not target_file.exists():
+                    shutil.copy2(source_file, target_file)
+                    logger.info(f"Copied file: {source_file.name} -> {target_file}")
+                    copied_files += 1
+                else:
+                    logger.debug(f"Skipped existing file: {source_file.name}")
+                    skipped_files += 1
+            except Exception as e:
+                logger.error(f"Failed to copy {source_file.name}: {str(e)}")
+                failed_files += 1
+        
+        logger.info(f"Icon copy summary - Copied: {copied_files}, Skipped: {skipped_files}, Failed: {failed_files}")
+        
     except Exception as e:
         logger.error(f"Error ensuring module icons directory: {str(e)}", exc_info=True)
+        raise
+
+def get_match_score(name1: str, name2: str) -> float:
+    """Calculate match score between two module names."""
+    name1_parts = set(name1.lower().split('_'))
+    name2_parts = set(name2.lower().split('_'))
+    common_parts = name1_parts.intersection(name2_parts)
+    
+    if not name1_parts or not name2_parts:
+        return 0
+    
+    # Calculate Jaccard similarity
+    similarity = len(common_parts) / len(name1_parts.union(name2_parts))
+    return similarity
 
 def normalize_module_name(module_name: str) -> str:
     """Normalize module name for icon matching."""
@@ -80,8 +114,11 @@ def normalize_module_name(module_name: str) -> str:
         if name.startswith(prefix):
             name = name[len(prefix):]
     
-    # Replace special characters
-    name = name.replace(' ', '_').replace('-', '_')
+    # Replace special characters and normalize spaces
+    name = re.sub(r'[^a-z0-9]+', '_', name.lower())
+    name = re.sub(r'_+', '_', name)
+    name = name.strip('_')
+    
     logger.debug(f"Normalized module name: {module_name} -> {name}")
     return name
 
@@ -101,47 +138,53 @@ def get_local_icon_path(module_name: str) -> str:
         normalized_name = normalize_module_name(module_name)
         logger.info(f"Normalized name for matching: {normalized_name}")
         
-        icons_dir = "static/module_icons"
-        if not os.path.exists(icons_dir):
+        icons_dir = Path("static/module_icons")
+        if not icons_dir.exists():
             logger.error(f"Icons directory not found: {icons_dir}")
             return default_icon
+            
+        # Get main keywords from module name
+        keywords = normalized_name.split('_')
+        main_keywords = [k for k in keywords if len(k) > 3]
         
-        # List of possible icon name variations
-        possible_names = [
-            f"{normalized_name}.png",
-            f"{module_name.lower()}.png",
-            f"{module_name}.png",
-            # Additional variations
-            f"odoo_{normalized_name}.png",
-            f"module_{normalized_name}.png",
-            f"{normalized_name}_icon.png"
-        ]
+        # Track all available icons
+        all_icons = list(icons_dir.glob('*.png'))
+        logger.info(f"Found {len(all_icons)} icons in directory")
         
-        # Log all attempted matches
-        logger.info(f"Attempting to match icon names: {possible_names}")
+        # 1. Try exact case-insensitive match
+        for icon_path in all_icons:
+            icon_name = icon_path.stem.lower()
+            if icon_name == normalized_name:
+                logger.info(f"Found exact case-insensitive match: {icon_path}")
+                return f"/static/module_icons/{icon_path.name}"
         
-        # Check for exact matches first
-        for icon_name in possible_names:
-            icon_path = os.path.join(icons_dir, icon_name)
-            if os.path.exists(icon_path):
-                logger.info(f"Found exact match icon for module {module_name}: {icon_name}")
-                return f"/static/module_icons/{icon_name}"
+        # 2. Try full module name containment
+        for icon_path in all_icons:
+            icon_name = normalize_module_name(icon_path.stem)
+            if normalized_name in icon_name or icon_name in normalized_name:
+                match_score = get_match_score(normalized_name, icon_name)
+                if match_score >= 0.5:  # Require 50% match
+                    logger.info(f"Found full name match (score: {match_score}): {icon_path}")
+                    return f"/static/module_icons/{icon_path.name}"
         
-        # If no exact match, try fuzzy matching
-        all_icons = os.listdir(icons_dir)
-        logger.info(f"No exact match found. Trying fuzzy matching with {len(all_icons)} icons")
+        # 3. Try matching main keywords
+        best_match = None
+        best_score = 0
         
-        for icon_file in all_icons:
-            if icon_file.lower().endswith('.png'):
-                base_name = os.path.splitext(icon_file)[0].lower()
-                # Try matching parts of the name
-                name_parts = normalized_name.split('_')
-                for part in name_parts:
-                    if len(part) > 3 and (part in base_name or base_name in part):
-                        logger.info(f"Found fuzzy match icon for module {module_name}: {icon_file} (matched part: {part})")
-                        return f"/static/module_icons/{icon_file}"
+        for icon_path in all_icons:
+            icon_name = normalize_module_name(icon_path.stem)
+            for keyword in main_keywords:
+                if keyword in icon_name:
+                    match_score = get_match_score(keyword, icon_name)
+                    if match_score > best_score:
+                        best_score = match_score
+                        best_match = icon_path
+                        logger.info(f"Found keyword match '{keyword}' (score: {match_score}): {icon_path}")
         
-        logger.warning(f"No icon found for module {module_name}, using default")
+        if best_match and best_score >= 0.3:  # Require at least 30% match for keywords
+            return f"/static/module_icons/{best_match.name}"
+        
+        logger.warning(f"No suitable icon found for module {module_name}, using default")
         return default_icon
         
     except Exception as e:
@@ -149,30 +192,17 @@ def get_local_icon_path(module_name: str) -> str:
         return default_icon
 
 def process_image_queue():
-    """Background thread for processing image queue with improved error handling."""
+    """Background thread for processing image queue with improved error handling and retry mechanism."""
     global queue_active
     
     logger.info("Starting image queue processing thread")
     
-    while queue_active:
-        try:
-            # Use increased timeout to prevent premature exits
-            task = image_queue.get(timeout=5)
-            if task is None:
-                logger.info("Received shutdown signal in image queue")
-                break
-            
-            module_name, callback = task
-            logger.info(f"Processing module icon: {module_name}")
-            
-            # Thread-safe check for already processed items
-            with processed_items_lock:
-                if module_name in processed_items:
-                    logger.info(f"Module {module_name} already processed, skipping")
-                    image_queue.task_done()
-                    continue
-            
+    def process_module_with_retry(module_name: str, callback: callable, max_retries: int = MAX_RETRIES) -> bool:
+        """Process a single module with retry mechanism."""
+        for attempt in range(max_retries):
             try:
+                logger.info(f"Processing module icon: {module_name} (attempt {attempt + 1}/{max_retries})")
+                
                 image_path = get_local_icon_path(module_name)
                 module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
                 
@@ -184,19 +214,43 @@ def process_image_queue():
                 if callback:
                     callback(info)
                 
+                logger.info(f"Successfully processed module: {module_name}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error processing module {module_name} (attempt {attempt + 1}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(1 * (attempt + 1))  # Exponential backoff
+                    continue
+                return False
+    
+    while queue_active:
+        try:
+            # Use increased timeout to prevent premature exits
+            task = image_queue.get(timeout=5)
+            if task is None:
+                logger.info("Received shutdown signal in image queue")
+                break
+            
+            module_name, callback = task
+            
+            # Thread-safe check for already processed items
+            with processed_items_lock:
+                if module_name in processed_items:
+                    logger.info(f"Module {module_name} already processed, skipping")
+                    image_queue.task_done()
+                    continue
+            
+            success = process_module_with_retry(module_name, callback)
+            
+            if success:
                 # Thread-safe addition to processed set
                 with processed_items_lock:
                     processed_items.add(module_name)
-                    logger.info(f"Successfully processed module: {module_name}")
-                
-                # Signal task completion
-                queue_event.set()
-                image_queue.task_done()
-                
-            except Exception as e:
-                logger.error(f"Error processing module {module_name}: {str(e)}", exc_info=True)
-                # Ensure task_done is called even on error
-                image_queue.task_done()
+            
+            # Signal task completion
+            queue_event.set()
+            image_queue.task_done()
             
         except queue.Empty:
             logger.debug("Image queue timeout, continuing to wait")

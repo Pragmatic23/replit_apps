@@ -43,7 +43,7 @@ MODULE_VARIATIONS = {
     'employees': ['employees.png', 'employee.png', 'hr.png'],
     'timesheets': ['timesheet.png', 'timesheets.png'],
     'leaves': ['time_off.png', 'leave.png', 'leaves.png'],
-    'sales': ['Sales.png', 'sale.png', 'crm.png'],
+    'sales': ['sales.png', 'Sales.png', 'sale.png', 'crm.png', 'CRM.png'],
     'inventory': ['Inventory.png', 'stock.png', 'warehouse.png'],
     'purchase': ['Purchase.png', 'procurement.png'],
     'point_of_sale': ['pos.png', 'point_of_sale.png'],
@@ -115,13 +115,19 @@ def get_local_icon_path(module_name: str) -> str:
             logger.info(f"Checking exact matches for {normalized_name}: {MODULE_VARIATIONS[normalized_name]}")
             for match in MODULE_VARIATIONS[normalized_name]:
                 icon_path = icons_dir / match
+                logger.debug(f"Checking exact match path: {icon_path}")
                 if icon_path.exists():
                     logger.info(f"Found exact match: {icon_path}")
                     return f"/static/module_icons/{match}"
+                else:
+                    logger.debug(f"Exact match not found at: {icon_path}")
         
         # Case-insensitive search for direct matches
         for icon_path in all_icons:
-            if normalize_module_name(icon_path.stem) == normalized_name:
+            icon_name = icon_path.stem.lower()
+            normalized_icon = normalize_module_name(icon_name)
+            logger.debug(f"Checking case-insensitive match: {icon_path} (normalized: {normalized_icon})")
+            if normalized_icon == normalized_name:
                 logger.info(f"Found case-insensitive match: {icon_path}")
                 return f"/static/module_icons/{icon_path.name}"
         
@@ -207,15 +213,24 @@ def ensure_module_icons_dir():
         for source_file in source_icons:
             target_file = target_dir / source_file.name
             try:
+                logger.debug(f"Processing file: {source_file.name}")
                 if not target_file.exists():
+                    logger.info(f"Copying file: {source_file} -> {target_file}")
                     shutil.copy2(source_file, target_file)
                     # Set file permissions (644)
                     target_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-                    logger.info(f"Copied file: {source_file.name} -> {target_file}")
+                    logger.info(f"Successfully copied file: {source_file.name} -> {target_file}")
                     copied_files += 1
                 else:
-                    logger.debug(f"Skipped existing file: {source_file.name}")
-                    skipped_files += 1
+                    # Verify file integrity
+                    if os.path.getsize(source_file) == os.path.getsize(target_file):
+                        logger.debug(f"Skipped existing file (verified): {source_file.name}")
+                        skipped_files += 1
+                    else:
+                        logger.warning(f"File size mismatch, re-copying: {source_file.name}")
+                        shutil.copy2(source_file, target_file)
+                        target_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                        copied_files += 1
             except Exception as e:
                 logger.error(f"Failed to copy {source_file.name}: {str(e)}")
                 failed_files += 1
@@ -227,6 +242,7 @@ def ensure_module_icons_dir():
             for source_file in retry_files:
                 try:
                     target_file = target_dir / source_file.name
+                    logger.info(f"Retrying copy: {source_file} -> {target_file}")
                     if not target_file.exists():
                         shutil.copy2(source_file, target_file)
                         target_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
@@ -235,6 +251,14 @@ def ensure_module_icons_dir():
                         failed_files -= 1
                 except Exception as e:
                     logger.error(f"Retry failed for {source_file.name}: {str(e)}")
+        
+        # Verify sales.png specifically
+        sales_icon = target_dir / "sales.png"
+        if sales_icon.exists():
+            logger.info(f"Verified sales.png exists at: {sales_icon}")
+            logger.info(f"Sales icon size: {os.path.getsize(sales_icon)} bytes")
+        else:
+            logger.error("sales.png not found in target directory")
         
         # Verify final icon inventory
         final_icons = list(target_dir.glob('*.png'))
@@ -247,9 +271,6 @@ def ensure_module_icons_dir():
         logger.error(f"Error ensuring module icons directory: {str(e)}", exc_info=True)
         raise
 
-# Updated system prompt as per requirements
-SYSTEM_PROMPT = """Assist me in creating a system that accurately recommends Odoo apps based solely on user input and predefined requirements. Use the provided dataset of official Odoo modules and their descriptions to generate responses. Avoid suggesting unrelated or random Odoo modules that are not part of the dataset. Ensure that each recommendation is relevant to the user's input and linked to its correct functionality and description."""
-
 # Image queue with improved error handling and synchronization
 image_queue = queue.Queue()
 queue_lock = RLock()  # Using RLock for recursive locking capability
@@ -260,10 +281,11 @@ queue_event = Event()
 # Shared state for processed items with thread-safe access
 processed_items = set()
 MAX_RETRIES = 3
+QUEUE_TIMEOUT = 2  # Reduced from 5 to 2 seconds
 
 def process_image_queue():
     """Background thread for processing image queue with improved error handling and retry mechanism."""
-    global queue_active
+    global queue_active, processed_items
     
     logger.info("Starting image queue processing thread")
     
@@ -296,13 +318,15 @@ def process_image_queue():
     
     while queue_active:
         try:
-            # Use increased timeout to prevent premature exits
-            task = image_queue.get(timeout=5)
+            logger.debug("Waiting for new items in queue...")
+            task = image_queue.get(timeout=QUEUE_TIMEOUT)
+            
             if task is None:
                 logger.info("Received shutdown signal in image queue")
                 break
             
             module_name, callback = task
+            logger.info(f"Processing queue item: {module_name}")
             
             # Thread-safe check for already processed items
             with processed_items_lock:
@@ -317,10 +341,12 @@ def process_image_queue():
                 # Thread-safe addition to processed set
                 with processed_items_lock:
                     processed_items.add(module_name)
+                    logger.debug(f"Added {module_name} to processed items. Total processed: {len(processed_items)}")
             
             # Signal task completion
             queue_event.set()
             image_queue.task_done()
+            logger.debug(f"Completed processing {module_name}")
             
         except queue.Empty:
             logger.debug("Image queue timeout, continuing to wait")
@@ -331,6 +357,21 @@ def process_image_queue():
                 image_queue.task_done()
             except ValueError:
                 pass
+
+def clear_queue():
+    """Clear the image queue and processed items."""
+    global processed_items
+    logger.info("Clearing image queue and processed items")
+    try:
+        while True:
+            image_queue.get_nowait()
+            image_queue.task_done()
+    except queue.Empty:
+        pass
+    
+    with processed_items_lock:
+        processed_items.clear()
+    logger.info("Queue and processed items cleared")
 
 # Start image processing thread
 image_thread = threading.Thread(target=process_image_queue, daemon=True)

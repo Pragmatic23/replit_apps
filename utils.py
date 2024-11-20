@@ -21,6 +21,8 @@ import threading
 import shutil
 from pathlib import Path
 import stat
+import hashlib
+import redis
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -36,6 +38,88 @@ if not OPENAI_API_KEY:
     raise ValueError("OpenAI API key is required")
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+# Initialize Redis client with fallback to memory cache
+try:
+    redis_client = redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379"))
+    redis_client.ping()
+    logger.info("Redis connected successfully for icon caching")
+    USE_REDIS = True
+except (redis.ConnectionError, redis.ResponseError) as e:
+    logger.warning(f"Redis unavailable for icon caching, using memory cache: {str(e)}")
+    USE_REDIS = False
+
+# Memory cache for fallback
+icon_cache = {}
+CACHE_TIMEOUT = 3600  # 1 hour cache timeout
+
+class IconCache:
+    def __init__(self):
+        self.memory_cache = {}
+        self.cache_lock = RLock()
+
+    def get_cache_key(self, module_name: str) -> str:
+        """Generate a consistent cache key for a module name."""
+        return f"icon_cache:{hashlib.md5(module_name.encode()).hexdigest()}"
+
+    def get_icon(self, module_name: str) -> Optional[str]:
+        """Get icon path from cache with Redis/memory fallback."""
+        cache_key = self.get_cache_key(module_name)
+        
+        if USE_REDIS:
+            try:
+                cached_path = redis_client.get(cache_key)
+                if cached_path:
+                    logger.debug(f"Redis cache hit for {module_name}")
+                    return cached_path.decode('utf-8')
+            except Exception as e:
+                logger.error(f"Redis error while getting icon: {str(e)}")
+                
+        with self.cache_lock:
+            cached_item = self.memory_cache.get(cache_key)
+            if cached_item:
+                path, timestamp = cached_item
+                if time.time() - timestamp < CACHE_TIMEOUT:
+                    logger.debug(f"Memory cache hit for {module_name}")
+                    return path
+                else:
+                    del self.memory_cache[cache_key]
+        
+        return None
+
+    def set_icon(self, module_name: str, icon_path: str) -> None:
+        """Store icon path in cache with Redis/memory fallback."""
+        cache_key = self.get_cache_key(module_name)
+        
+        if USE_REDIS:
+            try:
+                redis_client.setex(cache_key, CACHE_TIMEOUT, icon_path)
+                logger.debug(f"Icon cached in Redis for {module_name}")
+                return
+            except Exception as e:
+                logger.error(f"Redis error while setting icon: {str(e)}")
+        
+        with self.cache_lock:
+            self.memory_cache[cache_key] = (icon_path, time.time())
+            logger.debug(f"Icon cached in memory for {module_name}")
+
+    def clear_cache(self) -> None:
+        """Clear both Redis and memory caches."""
+        if USE_REDIS:
+            try:
+                keys = redis_client.keys("icon_cache:*")
+                if keys:
+                    redis_client.delete(*keys)
+                logger.info("Redis icon cache cleared")
+            except Exception as e:
+                logger.error(f"Error clearing Redis cache: {str(e)}")
+        
+        with self.cache_lock:
+            self.memory_cache.clear()
+            logger.info("Memory icon cache cleared")
+
+# Initialize the icon cache
+icon_cache_manager = IconCache()
 
 # Common module name variations with exact matches
 MODULE_VARIATIONS = {
@@ -588,3 +672,61 @@ def stream_openai_response(prompt: str) -> Generator[str, None, None]:
     except Exception as e:
         logger.error(f"Error streaming OpenAI response: {str(e)}", exc_info=True)
         yield json.dumps({"error": str(e)})
+
+def get_local_icon_path(module_name: str) -> str:
+    """Get the local icon path for a module with caching."""
+    try:
+        # Check cache first
+        cached_path = icon_cache_manager.get_icon(module_name)
+        if cached_path:
+            logger.info(f"Cache hit for module {module_name}")
+            return cached_path
+            
+        logger.info(f"Cache miss for module {module_name}, finding icon...")
+        
+        # Ensure module icons are in place
+        ensure_module_icons_dir()
+        
+        # Default icon path
+        default_icon = "/static/images/default_module_icon.svg"
+        
+        # Special case handling for Point of Sale
+        if "point of sale" in module_name.lower() or "pos" in module_name.lower():
+            module_name = "point_of_sale"
+        
+        # Normalize the module name for matching
+        normalized_name = normalize_module_name(module_name)
+        logger.info(f"Normalized name for matching: {normalized_name}")
+        
+        icons_dir = Path("static/module_icons")
+        if not icons_dir.exists():
+            logger.error(f"Icons directory not found: {icons_dir}")
+            return default_icon
+        
+        icon_path = default_icon
+        
+        # Try exact matches from MODULE_VARIATIONS first
+        if normalized_name in MODULE_VARIATIONS:
+            logger.info(f"Checking exact matches for {normalized_name}: {MODULE_VARIATIONS[normalized_name]}")
+            for match in MODULE_VARIATIONS[normalized_name]:
+                potential_path = icons_dir / match
+                if potential_path.exists():
+                    icon_path = f"/static/module_icons/{match}"
+                    break
+        
+        # If no match found, try case-insensitive search
+        if icon_path == default_icon:
+            for icon_file in icons_dir.glob('*.png'):
+                if normalize_module_name(icon_file.stem) == normalized_name:
+                    icon_path = f"/static/module_icons/{icon_file.name}"
+                    break
+        
+        # Cache the result
+        icon_cache_manager.set_icon(module_name, icon_path)
+        logger.info(f"Icon path {icon_path} cached for module {module_name}")
+        
+        return icon_path
+        
+    except Exception as e:
+        logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
+        return "/static/images/default_module_icon.svg"

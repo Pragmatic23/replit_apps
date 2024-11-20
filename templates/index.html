@@ -124,7 +124,7 @@
                         </div>
 
                         <div class="text-center">
-                            <button type="submit" class="btn btn-primary btn-lg position-relative overflow-hidden">
+                            <button type="submit" class="btn btn-primary btn-lg position-relative">
                                 <div class="button-content">
                                     <i class="fas fa-magic me-2"></i>
                                     Get Recommendations
@@ -132,7 +132,7 @@
                                 <div class="progress position-absolute bottom-0 start-0 w-100" style="height: 4px;">
                                     <div class="progress-bar bg-light" role="progressbar" style="width: 0%"></div>
                                 </div>
-                                <span class="progress-text"></span>
+                                <span class="progress-text position-absolute top-50 start-50 translate-middle"></span>
                             </button>
                         </div>
                     </form>
@@ -164,11 +164,15 @@
 }
 
 .submitting .progress-text {
-    display: block;
+    display: block !important;
 }
 
 .progress-bar {
-    transition: width 0.3s ease-in-out;
+    transition: width 0.1s ease-in-out;
+}
+
+button[type="submit"].submitting {
+    position: relative;
 }
 
 button[type="submit"] {

@@ -48,14 +48,37 @@ document.addEventListener('DOMContentLoaded', function() {
             if (buttonContent) buttonContent.style.opacity = '1';
             submitButton.disabled = false;
         }
-        
+
+        // Handle form submission and progress animation
+        if (recommendationsForm && submitButton) {
+            recommendationsForm.addEventListener('submit', function(event) {
+                if (!this.checkValidity()) {
+                    event.preventDefault();
+                    return;
+                }
+
+                submitButton.classList.add('submitting');
+                submitButton.disabled = true;
+                const buttonContent = submitButton.querySelector('.button-content');
+                const progressText = submitButton.querySelector('.progress-text');
+                const progressBar = submitButton.querySelector('.progress-bar');
+                
+                if (buttonContent) buttonContent.style.opacity = '0.7';
+                if (progressText) progressText.textContent = '0%';
+                if (progressBar) progressBar.style.width = '0%';
+                
+                progress = 0;
+                progressInterval = setInterval(updateProgress, 100);
+            });
+        }
+
+        // Handle Odoo experience form logic
         if (editionVersionContainer && experienceRadios.length) {
             debug('Form elements found - initializing conditional logic');
             
             const editionInputs = recommendationsForm.querySelectorAll('input[name="preferred_edition"]');
             const versionSelect = document.getElementById('current_version');
 
-            // Function to safely update form fields with error handling
             function updateFormFields(showFields) {
                 try {
                     if (editionVersionContainer) {
@@ -71,17 +94,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     editionInputs.forEach(input => {
                         if (input) {
                             input.required = showFields;
-                            if (!showFields) {
-                                input.checked = false;
-                            }
+                            if (!showFields) input.checked = false;
                         }
                     });
 
                     if (versionSelect) {
                         versionSelect.required = showFields;
-                        if (!showFields) {
-                            versionSelect.selectedIndex = 0;
-                        }
+                        if (!showFields) versionSelect.selectedIndex = 0;
                     }
 
                     debug(`Form fields updated - Experience: ${showFields ? 'Yes' : 'No'}`);
@@ -96,48 +115,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
             experienceRadios.forEach(radio => {
                 radio.addEventListener('change', function(event) {
-                    const hasExperience = event.target.value === 'yes';
-                    debug(`Experience changed to: ${hasExperience ? 'Yes' : 'No'}`);
-                    updateFormFields(hasExperience);
+                    updateFormFields(event.target.value === 'yes');
                 });
             });
 
             const selectedExperience = recommendationsForm.querySelector('input[name="has_odoo_experience"]:checked');
             if (selectedExperience) {
-                const hasExperience = selectedExperience.value === 'yes';
-                debug(`Initializing form with experience: ${hasExperience ? 'Yes' : 'No'}`);
-                updateFormFields(hasExperience);
+                updateFormFields(selectedExperience.value === 'yes');
             } else {
-                debug('No experience option selected initially');
                 updateFormFields(false);
             }
-        }
-
-        // Handle form submission and progress animation
-        if (recommendationsForm && submitButton) {
-            recommendationsForm.addEventListener('submit', function(event) {
-                if (!this.checkValidity()) {
-                    event.preventDefault();
-                    return;
-                }
-
-                // Initialize progress animation
-                submitButton.classList.add('submitting');
-                submitButton.disabled = true;
-                submitButton.querySelector('.button-content').style.opacity = '0.7';
-                progress = 0;
-                
-                // Reset and start progress
-                const progressText = submitButton.querySelector('.progress-text');
-                const progressBar = submitButton.querySelector('.progress-bar');
-                if (progressText) progressText.textContent = '0%';
-                if (progressBar) progressBar.style.width = '0%';
-                
-                // Start progress animation with shorter intervals for smoother animation
-                progressInterval = setInterval(updateProgress, 300);
-                
-                debug('Form submission started - progress tracking initialized');
-            });
         }
     } else {
         debug('Not on recommendations form page - checking for auth forms');
@@ -145,56 +132,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Handle auth forms if they exist
         if (authForm) {
             debug('Auth form found - initializing validation');
-
-            // Password toggle functionality
-            function setupPasswordToggle(inputId, toggleId) {
-                const input = document.getElementById(inputId);
-                const toggle = document.getElementById(toggleId);
-                
-                if (input && toggle) {
-                    toggle.addEventListener('click', () => {
-                        const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
-                        input.setAttribute('type', type);
-                        const icon = toggle.querySelector('i');
-                        if (icon) {
-                            icon.classList.toggle('fa-eye');
-                            icon.classList.toggle('fa-eye-slash');
-                        }
-                    });
-                }
-            }
-
-            setupPasswordToggle('password', 'togglePassword');
-            setupPasswordToggle('confirm_password', 'toggleConfirmPassword');
-
-            // Form validation
             authForm.addEventListener('submit', function(event) {
                 if (!this.checkValidity()) {
                     event.preventDefault();
                     event.stopPropagation();
                 }
-
-                // Additional password match validation for signup form
-                const password = document.getElementById('password');
-                const confirmPassword = document.getElementById('confirm_password');
-                if (password && confirmPassword && password.value !== confirmPassword.value) {
-                    confirmPassword.setCustomValidity("Passwords don't match");
-                    event.preventDefault();
-                } else if (confirmPassword) {
-                    confirmPassword.setCustomValidity('');
-                }
-
                 this.classList.add('was-validated');
-            });
-
-            // Clear custom validity on input
-            const inputs = authForm.querySelectorAll('input');
-            inputs.forEach(input => {
-                if (input) {
-                    input.addEventListener('input', () => {
-                        input.setCustomValidity('');
-                    });
-                }
             });
         }
     }

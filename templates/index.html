@@ -124,9 +124,15 @@
                         </div>
 
                         <div class="text-center">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-magic me-2"></i>
-                                Get Recommendations
+                            <button type="submit" class="btn btn-primary btn-lg position-relative overflow-hidden">
+                                <div class="button-content">
+                                    <i class="fas fa-magic me-2"></i>
+                                    Get Recommendations
+                                </div>
+                                <div class="progress position-absolute bottom-0 start-0 w-100" style="height: 4px;">
+                                    <div class="progress-bar bg-light" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <span class="position-absolute top-50 start-50 translate-middle progress-text"></span>
                             </button>
                         </div>
                     </form>
@@ -135,4 +141,26 @@
         </div>
     </div>
 </div>
+
+<style>
+.button-content {
+    position: relative;
+    z-index: 1;
+    transition: opacity 0.3s ease;
+}
+.progress-text {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--bs-light);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    opacity: 0.9;
+    z-index: 2;
+}
+button[type="submit"] {
+    min-height: 48px;
+}
+button[type="submit"]:disabled {
+    cursor: not-allowed;
+}
+</style>
 {% endblock %}

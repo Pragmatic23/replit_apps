@@ -14,6 +14,32 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const editionVersionContainer = document.getElementById('edition-version-container');
         const experienceRadios = recommendationsForm.querySelectorAll('input[name="has_odoo_experience"]');
+        const submitButton = recommendationsForm.querySelector('button[type="submit"]');
+        
+        // Progress tracking variables
+        let progress = 0;
+        let progressInterval;
+        
+        // Function to update button progress
+        function updateProgress() {
+            progress += Math.random() * 15;
+            if (progress > 90) {
+                progress = 90;  // Cap at 90% until complete
+                clearInterval(progressInterval);
+            }
+            submitButton.querySelector('.progress-text').textContent = `${Math.round(progress)}%`;
+            submitButton.querySelector('.progress-bar').style.width = `${progress}%`;
+        }
+
+        // Function to reset button progress
+        function resetProgress() {
+            progress = 0;
+            clearInterval(progressInterval);
+            submitButton.querySelector('.progress-text').textContent = '';
+            submitButton.querySelector('.progress-bar').style.width = '0%';
+            submitButton.querySelector('.button-content').style.opacity = '1';
+            submitButton.disabled = false;
+        }
         
         if (editionVersionContainer && experienceRadios.length) {
             debug('Form elements found - initializing conditional logic');
@@ -77,6 +103,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 debug('No experience option selected initially');
                 updateFormFields(false);
             }
+        }
+
+        // Handle form submission and progress animation
+        if (recommendationsForm && submitButton) {
+            recommendationsForm.addEventListener('submit', function(event) {
+                if (!this.checkValidity()) {
+                    event.preventDefault();
+                    return;
+                }
+
+                // Start progress animation
+                submitButton.disabled = true;
+                submitButton.querySelector('.button-content').style.opacity = '0.7';
+                progress = 0;
+                progressInterval = setInterval(updateProgress, 800);
+
+                // Handle actual form submission
+                submitButton.querySelector('.progress-text').textContent = '0%';
+                debug('Form submission started - initializing progress tracking');
+            });
         }
     } else {
         debug('Not on recommendations form page - checking for auth forms');

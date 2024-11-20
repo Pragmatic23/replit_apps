@@ -92,19 +92,32 @@ queue_lock = RLock()  # Using RLock for recursive locking capability
 processed_items_lock = RLock()
 queue_active = True
 queue_event = Event()
-queue_timeout = 30  # Timeout in seconds
+queue_timeout = 60  # Increased timeout
+CLEANUP_INTERVAL = 300  # 5 minutes
 
 # Shared state for processed items with thread-safe access
 processed_items = set()
 MAX_RETRIES = 3
 
 def process_image_queue():
-    """Background thread for processing image queue with improved error handling and retry mechanism."""
+    """Background thread for processing image queue with improved error handling and cleanup."""
     global queue_active
-    
-    logger.info("Starting image queue processing thread")
+    last_cleanup = time.time()
     last_activity = time.time()
     
+    logger.info("Starting image queue processing thread")
+    
+    def cleanup_queue():
+        """Cleanup stale items from queue."""
+        try:
+            with processed_items_lock:
+                processed_items.clear()
+            logger.info("Cleared processed items cache")
+            return time.time()
+        except Exception as e:
+            logger.error(f"Error during queue cleanup: {str(e)}")
+            return last_cleanup
+
     def process_module_with_retry(module_name: str, callback: callable, max_retries: int = MAX_RETRIES) -> bool:
         """Process a single module with retry mechanism."""
         nonlocal last_activity
@@ -112,8 +125,6 @@ def process_image_queue():
         for attempt in range(max_retries):
             try:
                 logger.info(f"Processing module icon: {module_name} (attempt {attempt + 1}/{max_retries})")
-                
-                # Update activity timestamp
                 last_activity = time.time()
                 
                 image_path = get_local_icon_path(module_name)
@@ -133,25 +144,32 @@ def process_image_queue():
             except Exception as e:
                 logger.error(f"Error processing module {module_name} (attempt {attempt + 1}): {str(e)}")
                 if attempt < max_retries - 1:
-                    time.sleep(1 * (attempt + 1))  # Exponential backoff
+                    time.sleep(1 * (attempt + 1))
                     continue
                 return False
     
     while queue_active:
         try:
-            # Check for inactivity timeout
-            if time.time() - last_activity > queue_timeout:
-                logger.debug("Queue inactive, continuing to process")
-                last_activity = time.time()
+            # Check for cleanup interval
+            if time.time() - last_cleanup > CLEANUP_INTERVAL:
+                last_cleanup = cleanup_queue()
             
-            task = image_queue.get(timeout=5)
+            # Use shorter timeout for queue.get()
+            try:
+                task = image_queue.get(timeout=5)
+            except queue.Empty:
+                # Reset activity timer if needed
+                if time.time() - last_activity > queue_timeout:
+                    logger.debug("Queue inactive, resetting timer")
+                    last_activity = time.time()
+                continue
+            
             if task is None:
                 logger.info("Received shutdown signal in image queue")
                 break
             
             module_name, callback = task
             
-            # Thread-safe check for already processed items
             with processed_items_lock:
                 if module_name in processed_items:
                     logger.info(f"Module {module_name} already processed, skipping")
@@ -161,25 +179,19 @@ def process_image_queue():
             success = process_module_with_retry(module_name, callback)
             
             if success:
-                # Thread-safe addition to processed set
                 with processed_items_lock:
                     processed_items.add(module_name)
             
-            # Signal task completion
             queue_event.set()
             image_queue.task_done()
             
-        except queue.Empty:
-            if time.time() - last_activity > queue_timeout:
-                logger.debug("Queue timeout, resetting activity timer")
-                last_activity = time.time()
-            continue
         except Exception as e:
             logger.error(f"Error in image queue processing: {str(e)}", exc_info=True)
             try:
                 image_queue.task_done()
             except ValueError:
                 pass
+            time.sleep(1)  # Prevent tight error loop
 
 # Start image processing thread
 image_thread = threading.Thread(target=process_image_queue, daemon=True)

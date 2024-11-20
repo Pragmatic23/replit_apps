@@ -57,7 +57,6 @@ class IconCache:
     def __init__(self):
         self.memory_cache = {}
         self.cache_lock = RLock()
-        self.fallback_attempts = {}  # Track fallback attempts per module
 
     def get_cache_key(self, module_name: str) -> str:
         """Generate a consistent cache key for a module name."""
@@ -104,15 +103,6 @@ class IconCache:
             self.memory_cache[cache_key] = (icon_path, time.time())
             logger.debug(f"Icon cached in memory for {module_name}")
 
-    def track_fallback(self, module_name: str) -> bool:
-        """Track fallback attempts and return whether to try alternative icons."""
-        with self.cache_lock:
-            attempts = self.fallback_attempts.get(module_name, 0)
-            if attempts < 3:  # Allow up to 3 fallback attempts
-                self.fallback_attempts[module_name] = attempts + 1
-                return True
-            return False
-
     def clear_cache(self) -> None:
         """Clear both Redis and memory caches."""
         if USE_REDIS:
@@ -126,7 +116,6 @@ class IconCache:
         
         with self.cache_lock:
             self.memory_cache.clear()
-            self.fallback_attempts.clear()
             logger.info("Memory icon cache cleared")
 
 # Initialize the icon cache
@@ -181,8 +170,107 @@ def normalize_module_name(module_name: str) -> str:
         logger.error(f"Error normalizing module name {module_name}: {str(e)}", exc_info=True)
         return module_name.lower()
 
+# Image queue with improved error handling and synchronization
+image_queue = queue.Queue()
+queue_lock = RLock()  # Using RLock for recursive locking capability
+processed_items_lock = RLock()
+queue_active = True
+queue_event = Event()
+queue_timeout = 30  # Timeout in seconds
+
+# Shared state for processed items with thread-safe access
+processed_items = set()
+MAX_RETRIES = 3
+
+def process_image_queue():
+    """Background thread for processing image queue with improved error handling and retry mechanism."""
+    global queue_active
+    
+    logger.info("Starting image queue processing thread")
+    last_activity = time.time()
+    
+    def process_module_with_retry(module_name: str, callback: callable, max_retries: int = MAX_RETRIES) -> bool:
+        """Process a single module with retry mechanism."""
+        nonlocal last_activity
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Processing module icon: {module_name} (attempt {attempt + 1}/{max_retries})")
+                
+                # Update activity timestamp
+                last_activity = time.time()
+                
+                image_path = get_local_icon_path(module_name)
+                module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
+                
+                info = {
+                    'url': module_url,
+                    'image': image_path
+                }
+                
+                if callback:
+                    callback(info)
+                
+                logger.info(f"Successfully processed module: {module_name}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error processing module {module_name} (attempt {attempt + 1}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(1 * (attempt + 1))  # Exponential backoff
+                    continue
+                return False
+    
+    while queue_active:
+        try:
+            # Check for inactivity timeout
+            if time.time() - last_activity > queue_timeout:
+                logger.debug("Queue inactive, continuing to process")
+                last_activity = time.time()
+            
+            task = image_queue.get(timeout=5)
+            if task is None:
+                logger.info("Received shutdown signal in image queue")
+                break
+            
+            module_name, callback = task
+            
+            # Thread-safe check for already processed items
+            with processed_items_lock:
+                if module_name in processed_items:
+                    logger.info(f"Module {module_name} already processed, skipping")
+                    image_queue.task_done()
+                    continue
+            
+            success = process_module_with_retry(module_name, callback)
+            
+            if success:
+                # Thread-safe addition to processed set
+                with processed_items_lock:
+                    processed_items.add(module_name)
+            
+            # Signal task completion
+            queue_event.set()
+            image_queue.task_done()
+            
+        except queue.Empty:
+            if time.time() - last_activity > queue_timeout:
+                logger.debug("Queue timeout, resetting activity timer")
+                last_activity = time.time()
+            continue
+        except Exception as e:
+            logger.error(f"Error in image queue processing: {str(e)}", exc_info=True)
+            try:
+                image_queue.task_done()
+            except ValueError:
+                pass
+
+# Start image processing thread
+image_thread = threading.Thread(target=process_image_queue, daemon=True)
+image_thread.start()
+
 def get_local_icon_path(module_name: str) -> str:
-    """Get the local icon path for a module with enhanced fallback handling."""
+    """Get the local icon path for a module with enhanced matching."""
     try:
         # Ensure module icons are in place
         ensure_module_icons_dir()
@@ -192,17 +280,6 @@ def get_local_icon_path(module_name: str) -> str:
         
         # Default icon path
         default_icon = "/static/images/default_module_icon.svg"
-        
-        # Check if module name is empty or None
-        if not module_name:
-            logger.warning("Empty module name provided, using default icon")
-            return default_icon
-        
-        # Try to get cached icon path
-        cached_path = icon_cache_manager.get_icon(module_name)
-        if cached_path:
-            logger.info(f"Using cached icon path for {module_name}: {cached_path}")
-            return cached_path
         
         # Special case handling for Point of Sale
         if "point of sale" in module_name.lower() or "pos" in module_name.lower():
@@ -217,49 +294,43 @@ def get_local_icon_path(module_name: str) -> str:
             logger.error(f"Icons directory not found: {icons_dir}")
             return default_icon
         
+        # Log all available icons
+        all_icons = list(icons_dir.glob('*.png'))
+        logger.info(f"Available icons ({len(all_icons)}): {[icon.name for icon in all_icons]}")
+        
         # Try exact matches from MODULE_VARIATIONS first
         if normalized_name in MODULE_VARIATIONS:
             logger.info(f"Checking exact matches for {normalized_name}: {MODULE_VARIATIONS[normalized_name]}")
             for match in MODULE_VARIATIONS[normalized_name]:
                 icon_path = icons_dir / match
                 if icon_path.exists():
-                    result_path = f"/static/module_icons/{match}"
-                    icon_cache_manager.set_icon(module_name, result_path)
-                    logger.info(f"Found exact match: {result_path}")
-                    return result_path
+                    logger.info(f"Found exact match: {icon_path}")
+                    return f"/static/module_icons/{match}"
         
         # Case-insensitive search for direct matches
-        all_icons = list(icons_dir.glob('*.png'))
         for icon_path in all_icons:
             if normalize_module_name(icon_path.stem) == normalized_name:
-                result_path = f"/static/module_icons/{icon_path.name}"
-                icon_cache_manager.set_icon(module_name, result_path)
-                logger.info(f"Found case-insensitive match: {result_path}")
-                return result_path
+                logger.info(f"Found case-insensitive match: {icon_path}")
+                return f"/static/module_icons/{icon_path.name}"
         
-        # Try plural/singular forms if allowed by fallback tracking
-        if icon_cache_manager.track_fallback(module_name):
-            singular = normalized_name.rstrip('s')
-            plural = f"{normalized_name}s"
-            
-            logger.debug(f"Trying plural/singular forms - Singular: {singular}, Plural: {plural}")
-            
-            for icon_path in all_icons:
-                icon_normalized = normalize_module_name(icon_path.stem)
-                if icon_normalized in (singular, plural):
-                    result_path = f"/static/module_icons/{icon_path.name}"
-                    icon_cache_manager.set_icon(module_name, result_path)
-                    logger.info(f"Found plural/singular match: {result_path}")
-                    return result_path
+        # Try plural/singular forms
+        singular = normalized_name.rstrip('s')
+        plural = f"{normalized_name}s"
         
-        # If no suitable icon found, cache and return default
+        logger.debug(f"Trying plural/singular forms - Singular: {singular}, Plural: {plural}")
+        
+        for icon_path in all_icons:
+            icon_normalized = normalize_module_name(icon_path.stem)
+            if icon_normalized in (singular, plural):
+                logger.info(f"Found plural/singular match: {icon_path}")
+                return f"/static/module_icons/{icon_path.name}"
+        
         logger.warning(f"No suitable icon found for module {module_name}, using default")
-        icon_cache_manager.set_icon(module_name, default_icon)
         return default_icon
         
     except Exception as e:
         logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
-        return "/static/images/default_module_icon.svg"
+        return default_icon
 
 def ensure_module_icons_dir():
     """Ensure the module_icons directory exists and contains all icons."""

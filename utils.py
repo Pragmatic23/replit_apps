@@ -43,7 +43,7 @@ MODULE_VARIATIONS = {
     'employees': ['employees.png', 'employee.png', 'hr.png'],
     'timesheets': ['timesheet.png', 'timesheets.png'],
     'leaves': ['time_off.png', 'leave.png', 'leaves.png'],
-    'sales': ['sales.png', 'Sales.png', 'sale.png', 'crm.png', 'CRM.png'],
+    'sales': ['Sales.png', 'sale.png', 'crm.png'],
     'inventory': ['Inventory.png', 'stock.png', 'warehouse.png'],
     'purchase': ['Purchase.png', 'procurement.png'],
     'point_of_sale': ['pos.png', 'point_of_sale.png'],
@@ -86,8 +86,11 @@ def normalize_module_name(module_name: str) -> str:
         return module_name.lower()
 
 def get_local_icon_path(module_name: str) -> str:
-    """Get the local icon path with enhanced logging."""
+    """Get the local icon path for a module with enhanced matching."""
     try:
+        # Ensure module icons are in place
+        ensure_module_icons_dir()
+        
         # Log input module name
         logger.info(f"Finding icon for module: {module_name}")
         
@@ -109,32 +112,64 @@ def get_local_icon_path(module_name: str) -> str:
         
         # Try exact matches from MODULE_VARIATIONS first
         if normalized_name in MODULE_VARIATIONS:
-            variations = MODULE_VARIATIONS[normalized_name]
-            logger.info(f"Found variations for {normalized_name}: {variations}")
-            
-            for match in variations:
+            logger.info(f"Checking exact matches for {normalized_name}: {MODULE_VARIATIONS[normalized_name]}")
+            for match in MODULE_VARIATIONS[normalized_name]:
                 icon_path = icons_dir / match
-                logger.debug(f"Checking exact match: {match}")
                 if icon_path.exists():
                     logger.info(f"Found exact match: {icon_path}")
                     return f"/static/module_icons/{match}"
-                logger.debug(f"No match found for: {match}")
         
-        # Case-insensitive search
+        # Case-insensitive search for direct matches
         for icon_path in all_icons:
-            icon_name = icon_path.stem.lower()
-            normalized_icon = normalize_module_name(icon_name)
-            logger.debug(f"Checking icon: {icon_name} (normalized: {normalized_icon})")
-            
-            if normalized_icon == normalized_name:
+            if normalize_module_name(icon_path.stem) == normalized_name:
                 logger.info(f"Found case-insensitive match: {icon_path}")
                 return f"/static/module_icons/{icon_path.name}"
         
-        logger.warning(f"No icon found for {module_name}, using default")
+        # Try plural/singular forms
+        singular = normalized_name.rstrip('s')
+        plural = f"{normalized_name}s"
+        
+        logger.debug(f"Trying plural/singular forms - Singular: {singular}, Plural: {plural}")
+        
+        for icon_path in all_icons:
+            icon_normalized = normalize_module_name(icon_path.stem)
+            if icon_normalized in (singular, plural):
+                logger.info(f"Found plural/singular match: {icon_path}")
+                return f"/static/module_icons/{icon_path.name}"
+        
+        # If no exact match, try partial matching with enhanced logging
+        best_match = None
+        best_score = 0.2  # Lower threshold for fuzzy matching
+        match_details = []
+        
+        for icon_path in all_icons:
+            icon_name = normalize_module_name(icon_path.stem)
+            match_score = len(set(normalized_name.split('_')) & set(icon_name.split('_'))) / \
+                         max(len(normalized_name.split('_')), len(icon_name.split('_')))
+            
+            match_details.append({
+                'icon': icon_path.name,
+                'normalized_name': icon_name,
+                'score': match_score
+            })
+            
+            if match_score > best_score:
+                best_score = match_score
+                best_match = icon_path
+                logger.debug(f"New best match: {icon_path.name} (score: {match_score})")
+        
+        # Log all attempted matches for debugging
+        logger.debug(f"Match attempts: {json.dumps(match_details, indent=2)}")
+        
+        if best_match:
+            logger.info(f"Using best match: {best_match.name} (score: {best_score})")
+            return f"/static/module_icons/{best_match.name}"
+        
+        logger.warning(f"No suitable icon found for module {module_name}, using default")
         return default_icon
         
     except Exception as e:
-        logger.error(f"Error finding icon for {module_name}: {str(e)}")
+        logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
         return default_icon
 
 def ensure_module_icons_dir():
@@ -172,24 +207,15 @@ def ensure_module_icons_dir():
         for source_file in source_icons:
             target_file = target_dir / source_file.name
             try:
-                logger.debug(f"Processing file: {source_file.name}")
                 if not target_file.exists():
-                    logger.info(f"Copying file: {source_file} -> {target_file}")
                     shutil.copy2(source_file, target_file)
                     # Set file permissions (644)
                     target_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-                    logger.info(f"Successfully copied file: {source_file.name} -> {target_file}")
+                    logger.info(f"Copied file: {source_file.name} -> {target_file}")
                     copied_files += 1
                 else:
-                    # Verify file integrity
-                    if os.path.getsize(source_file) == os.path.getsize(target_file):
-                        logger.debug(f"Skipped existing file (verified): {source_file.name}")
-                        skipped_files += 1
-                    else:
-                        logger.warning(f"File size mismatch, re-copying: {source_file.name}")
-                        shutil.copy2(source_file, target_file)
-                        target_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-                        copied_files += 1
+                    logger.debug(f"Skipped existing file: {source_file.name}")
+                    skipped_files += 1
             except Exception as e:
                 logger.error(f"Failed to copy {source_file.name}: {str(e)}")
                 failed_files += 1
@@ -201,7 +227,6 @@ def ensure_module_icons_dir():
             for source_file in retry_files:
                 try:
                     target_file = target_dir / source_file.name
-                    logger.info(f"Retrying copy: {source_file} -> {target_file}")
                     if not target_file.exists():
                         shutil.copy2(source_file, target_file)
                         target_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
@@ -210,14 +235,6 @@ def ensure_module_icons_dir():
                         failed_files -= 1
                 except Exception as e:
                     logger.error(f"Retry failed for {source_file.name}: {str(e)}")
-        
-        # Verify sales.png specifically
-        sales_icon = target_dir / "sales.png"
-        if sales_icon.exists():
-            logger.info(f"Verified sales.png exists at: {sales_icon}")
-            logger.info(f"Sales icon size: {os.path.getsize(sales_icon)} bytes")
-        else:
-            logger.error("sales.png not found in target directory")
         
         # Verify final icon inventory
         final_icons = list(target_dir.glob('*.png'))
@@ -230,6 +247,9 @@ def ensure_module_icons_dir():
         logger.error(f"Error ensuring module icons directory: {str(e)}", exc_info=True)
         raise
 
+# Updated system prompt as per requirements
+SYSTEM_PROMPT = """Assist me in creating a system that accurately recommends Odoo apps based solely on user input and predefined requirements. Use the provided dataset of official Odoo modules and their descriptions to generate responses. Avoid suggesting unrelated or random Odoo modules that are not part of the dataset. Ensure that each recommendation is relevant to the user's input and linked to its correct functionality and description."""
+
 # Image queue with improved error handling and synchronization
 image_queue = queue.Queue()
 queue_lock = RLock()  # Using RLock for recursive locking capability
@@ -240,89 +260,77 @@ queue_event = Event()
 # Shared state for processed items with thread-safe access
 processed_items = set()
 MAX_RETRIES = 3
-QUEUE_TIMEOUT = 2  # Reduced from 5 to 2 seconds
 
 def process_image_queue():
-    """Process image queue in batches with enhanced logging."""
-    global queue_active, processed_items
+    """Background thread for processing image queue with improved error handling and retry mechanism."""
+    global queue_active
     
     logger.info("Starting image queue processing thread")
-    batch_size = 4  # Process up to 4 items at once
+    
+    def process_module_with_retry(module_name: str, callback: callable, max_retries: int = MAX_RETRIES) -> bool:
+        """Process a single module with retry mechanism."""
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Processing module icon: {module_name} (attempt {attempt + 1}/{max_retries})")
+                
+                image_path = get_local_icon_path(module_name)
+                module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
+                
+                info = {
+                    'url': module_url,
+                    'image': image_path
+                }
+                
+                if callback:
+                    callback(info)
+                
+                logger.info(f"Successfully processed module: {module_name}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error processing module {module_name} (attempt {attempt + 1}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(1 * (attempt + 1))  # Exponential backoff
+                    continue
+                return False
     
     while queue_active:
         try:
-            batch = []
-            # Collect batch of items
-            try:
-                while len(batch) < batch_size:
-                    task = image_queue.get(timeout=QUEUE_TIMEOUT)
-                    if task is None:
-                        if batch:
-                            break
-                        else:
-                            logger.info("Received shutdown signal in image queue")
-                            return
-                    batch.append(task)
-            except queue.Empty:
-                if not batch:
-                    logger.debug("Image queue timeout, continuing to wait")
+            # Use increased timeout to prevent premature exits
+            task = image_queue.get(timeout=5)
+            if task is None:
+                logger.info("Received shutdown signal in image queue")
+                break
+            
+            module_name, callback = task
+            
+            # Thread-safe check for already processed items
+            with processed_items_lock:
+                if module_name in processed_items:
+                    logger.info(f"Module {module_name} already processed, skipping")
+                    image_queue.task_done()
                     continue
-
-            logger.info(f"Processing batch of {len(batch)} items")
             
-            # Process batch
-            for module_name, callback in batch:
-                try:
-                    logger.info(f"Processing module icon: {module_name}")
-                    
-                    image_path = get_local_icon_path(module_name)
-                    module_url = f"https://apps.odoo.com/apps/modules/browse?search={module_name.lower().replace(' ', '-')}"
-                    
-                    info = {
-                        'url': module_url,
-                        'image': image_path
-                    }
-                    
-                    if callback:
-                        callback(info)
-                    
-                    with processed_items_lock:
-                        processed_items.add(module_name)
-                    
-                    logger.info(f"Successfully processed module: {module_name}")
-                    logger.debug(f"Icon path: {image_path}")
-                    
-                except Exception as e:
-                    logger.error(f"Error processing module {module_name}: {str(e)}")
-                finally:
-                    image_queue.task_done()
-
-            # Signal batch completion
+            success = process_module_with_retry(module_name, callback)
+            
+            if success:
+                # Thread-safe addition to processed set
+                with processed_items_lock:
+                    processed_items.add(module_name)
+            
+            # Signal task completion
             queue_event.set()
-            
-        except Exception as e:
-            logger.error(f"Error in batch processing: {str(e)}", exc_info=True)
-            # Ensure queue.task_done() is called for any remaining items
-            for _ in range(len(batch)):
-                try:
-                    image_queue.task_done()
-                except ValueError:
-                    pass
-
-def clear_queue():
-    """Clear the image queue and processed items."""
-    global processed_items
-    logger.info("Clearing image queue and processed items")
-    try:
-        while True:
-            image_queue.get_nowait()
             image_queue.task_done()
-    except queue.Empty:
-        pass
-    
-    with processed_items_lock:
-        processed_items.clear()
-    logger.info("Queue and processed items cleared")
+            
+        except queue.Empty:
+            logger.debug("Image queue timeout, continuing to wait")
+            continue
+        except Exception as e:
+            logger.error(f"Error in image queue processing: {str(e)}", exc_info=True)
+            try:
+                image_queue.task_done()
+            except ValueError:
+                pass
 
 # Start image processing thread
 image_thread = threading.Thread(target=process_image_queue, daemon=True)
@@ -337,56 +345,75 @@ def get_module_recommendations(
     has_experience: str = "no",
     stream: bool = False
 ) -> Union[Dict[str, Any], Response]:
-    """Get module recommendations with enhanced queueing and logging."""
+    """Get module recommendations with streaming support and optimizations."""
     try:
         if not OPENAI_API_KEY:
             logger.error("OpenAI API key is not configured")
             return {"error": "OpenAI API key is not configured"}
 
-        # Clear existing queue before processing new request
-        clear_queue()
-        logger.info("Cleared existing queue before processing new recommendations")
-
-        # Your existing OpenAI call logic here...
-        # For now we'll simulate module recommendations
-        modules = [
-            {"name": "Sales", "description": "Sales management module"},
-            {"name": "Project", "description": "Project management module"},
-            {"name": "Inventory", "description": "Inventory management module"},
-            {"name": "Purchase", "description": "Purchase management module"}
+        context_parts = [
+            f"Industry: {industry}" if industry else None,
+            f"Features: {', '.join(features)}" if features else None,
+            f"Edition: {preferred_edition.title()}" if preferred_edition else None,
+            f"Experience: {'Yes' if has_experience == 'yes' else 'No'}",
+            f"Requirements: {requirements}" if requirements else None
         ]
-
-        # Queue all module icons at once
-        logger.info(f"Preparing to queue {len(modules)} modules for icon processing")
-        module_info = {}
         
-        def update_module_info(info, module_name):
-            module_info[module_name] = info
-            logger.debug(f"Updated module info for {module_name}: {info}")
+        context = "\n".join(filter(None, context_parts))
+        prompt = f'''Recommend 4 Odoo modules for:\n{context}\n\nFormat:\nModule: [Name]\nDescription: [Core functionality]\nFeatures: [Key features]\nBenefits: [Value]'''
 
-        # Queue all modules at once with callbacks
+        if stream:
+            return Response(
+                stream_with_context(stream_openai_response(prompt)),
+                content_type='text/event-stream'
+            )
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=1000
+        )
+
+        content = response.choices[0].message.content
+        if not content:
+            return {"error": "No recommendations generated"}
+
+        modules = parse_module_response(content)
+        if not modules:
+            return {"error": "No valid recommendations found"}
+
+        # Reset queue event before processing new batch
+        queue_event.clear()
+        
+        module_info = {}
         for module in modules:
-            module_name = module["name"]
-            logger.debug(f"Queueing module for icon processing: {module_name}")
-            image_queue.put((module_name, lambda info, name=module_name: update_module_info(info, name)))
+            try:
+                image_queue.put(
+                    (module['name'], lambda info, name=module['name']: module_info.update({name: info})),
+                    timeout=5
+                )
+            except queue.Full:
+                logger.warning(f"Image generation queue full, skipping image for {module['name']}")
 
-        # Wait for all items to be processed
-        logger.info("Waiting for all module icons to be processed...")
-        image_queue.join()
-        logger.info("All module icons have been processed")
+        # Wait for all tasks to be processed with a timeout
+        queue_event.wait(timeout=10)
 
-        # Prepare response with processed module information
-        response = {
-            "modules": modules,
-            "urls": {name: info.get("url", "") for name, info in module_info.items()},
-            "images": {name: info.get("image", "") for name, info in module_info.items()}
+        result = {
+            'text': content,
+            'modules': modules,
+            'urls': {name: info['url'] for name, info in module_info.items()},
+            'images': {name: info['image'] for name, info in module_info.items()}
         }
 
-        return response
+        return result
 
     except Exception as e:
-        logger.error(f"Error in get_module_recommendations: {str(e)}", exc_info=True)
-        return {"error": str(e)}
+        logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
+        return {"error": f"Unable to generate recommendations: {str(e)}"}
 
 def parse_module_response(content: str) -> List[Dict[str, str]]:
     """Parse the OpenAI response content into structured module data with improved error handling."""

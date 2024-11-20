@@ -2,6 +2,7 @@
 
 {% block content %}
 <div class="min-h-screen bg-gradient">
+    <!-- Main Content -->
     <main class="container pt-2">
         <h1 class="recommendations-heading mb-4">Recommended Modules</h1>
 
@@ -24,8 +25,7 @@
                                      src="/static/images/placeholder.svg"
                                      data-module-name="{{ module.name }}"
                                      data-expected-path="{{ module_image }}"
-                                     onload="handleImageLoad(this)"
-                                     onerror="handleImageError(this)">
+                                     onerror="handleImageError(this);">
                             </div>
                             <div class="card-body">
                                 <h3 class="module-title">{{ module.name }}</h3>
@@ -91,19 +91,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Track successful image loads
-    function handleImageLoad(img) {
-        const moduleName = img.dataset.moduleName;
-        debug(`Successfully loaded image for module: ${moduleName}`);
-        img.classList.add('loaded');
-        
-        const container = img.closest('.module-image-container');
-        if (container) {
-            container.classList.add('loaded');
-        }
-    }
-    window.handleImageLoad = handleImageLoad;
-
     // Enhanced error handling for images
     function handleImageError(img) {
         const moduleName = img.dataset.moduleName;
@@ -146,6 +133,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     img.classList.remove('lazy');
                     observer.unobserve(img);
+                    
+                    img.onload = () => {
+                        debug(`Successfully loaded image for: ${moduleName}`);
+                        imageLoadingStates.set(moduleName, 'loaded');
+                        img.classList.add('loaded');
+                    };
+                    
+                    img.onerror = () => {
+                        debug(`Failed to load image for: ${moduleName}`, 'error');
+                        handleImageError(img);
+                        imageLoadingStates.set(moduleName, 'error');
+                    };
                 }
             }
         });

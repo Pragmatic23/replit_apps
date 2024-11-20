@@ -22,22 +22,30 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to update button progress
         function updateProgress() {
-            progress += Math.random() * 15;
+            progress += Math.random() * 5; // Smoother increment
             if (progress > 90) {
                 progress = 90;  // Cap at 90% until complete
                 clearInterval(progressInterval);
             }
-            submitButton.querySelector('.progress-text').textContent = `${Math.round(progress)}%`;
-            submitButton.querySelector('.progress-bar').style.width = `${progress}%`;
+            const progressText = submitButton.querySelector('.progress-text');
+            const progressBar = submitButton.querySelector('.progress-bar');
+            if (progressText && progressBar) {
+                progressText.textContent = `${Math.round(progress)}%`;
+                progressBar.style.width = `${progress}%`;
+            }
         }
 
         // Function to reset button progress
         function resetProgress() {
             progress = 0;
             clearInterval(progressInterval);
-            submitButton.querySelector('.progress-text').textContent = '';
-            submitButton.querySelector('.progress-bar').style.width = '0%';
-            submitButton.querySelector('.button-content').style.opacity = '1';
+            submitButton.classList.remove('submitting');
+            const progressText = submitButton.querySelector('.progress-text');
+            const progressBar = submitButton.querySelector('.progress-bar');
+            const buttonContent = submitButton.querySelector('.button-content');
+            if (progressText) progressText.textContent = '';
+            if (progressBar) progressBar.style.width = '0%';
+            if (buttonContent) buttonContent.style.opacity = '1';
             submitButton.disabled = false;
         }
         
@@ -113,15 +121,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                // Start progress animation
+                // Initialize progress animation
+                submitButton.classList.add('submitting');
                 submitButton.disabled = true;
                 submitButton.querySelector('.button-content').style.opacity = '0.7';
                 progress = 0;
-                progressInterval = setInterval(updateProgress, 800);
-
-                // Handle actual form submission
-                submitButton.querySelector('.progress-text').textContent = '0%';
-                debug('Form submission started - initializing progress tracking');
+                
+                // Reset and start progress
+                const progressText = submitButton.querySelector('.progress-text');
+                const progressBar = submitButton.querySelector('.progress-bar');
+                if (progressText) progressText.textContent = '0%';
+                if (progressBar) progressBar.style.width = '0%';
+                
+                // Start progress animation with shorter intervals for smoother animation
+                progressInterval = setInterval(updateProgress, 300);
+                
+                debug('Form submission started - progress tracking initialized');
             });
         }
     } else {

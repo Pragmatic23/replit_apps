@@ -26,10 +26,6 @@
                                      data-module-name="{{ module.name }}"
                                      data-expected-path="{{ module_image }}"
                                      onerror="handleImageError(this);">
-                                <div class="image-error-boundary" style="display: none;">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    <span>Error loading image</span>
-                                </div>
                             </div>
                             <div class="card-body">
                                 <h3 class="module-title">{{ module.name }}</h3>
@@ -95,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Enhanced error handling for images with retry mechanism
+    // Enhanced error handling for images
     function handleImageError(img) {
         const moduleName = img.dataset.moduleName;
         const expectedPath = img.dataset.expectedPath;
@@ -105,25 +101,12 @@ document.addEventListener('DOMContentLoaded', function() {
         debug(`Expected path: ${expectedPath}`, 'error');
         debug(`Current path: ${currentPath}`, 'error');
         
-        const container = img.closest('.module-image-container');
-        const errorBoundary = container.querySelector('.image-error-boundary');
-        
         if (currentPath !== '/static/images/default_module_icon.svg') {
-            debug(`Attempting fallback to default icon for: ${moduleName}`, 'warn');
-            
-            // Show error boundary temporarily
-            if (errorBoundary) {
-                errorBoundary.style.display = 'flex';
-                setTimeout(() => {
-                    errorBoundary.style.display = 'none';
-                }, 3000);
-            }
-            
-            // Set default icon
+            debug(`Falling back to default icon for: ${moduleName}`, 'warn');
             img.src = '/static/images/default_module_icon.svg';
-            img.classList.add('fallback-icon');
             
             // Add visual indicator for fallback
+            const container = img.closest('.module-image-container');
             if (container) {
                 container.classList.add('fallback-icon');
             }
@@ -131,11 +114,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     window.handleImageError = handleImageError;
 
-    // Lazy loading for images with enhanced error handling and retry mechanism
+    // Lazy loading for images with enhanced error handling
     const lazyImages = document.querySelectorAll('img.lazy');
     const imageLoadingStates = new Map();
-    const retryAttempts = new Map();
-    const MAX_RETRIES = 3;
     
     const imageObserver = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
@@ -146,41 +127,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!imageLoadingStates.has(moduleName)) {
                     debug(`Starting to load image for module: ${moduleName}`);
                     imageLoadingStates.set(moduleName, 'loading');
-                    retryAttempts.set(moduleName, 0);
                     
-                    const loadImage = () => {
-                        const attempts = retryAttempts.get(moduleName);
-                        if (attempts >= MAX_RETRIES) {
-                            debug(`Max retries reached for ${moduleName}, using fallback`, 'error');
-                            handleImageError(img);
-                            return;
-                        }
-                        
-                        debug(`Loading attempt ${attempts + 1} for ${moduleName}`);
-                        img.src = img.dataset.src;
-                        
-                        img.onload = () => {
-                            debug(`Successfully loaded image for: ${moduleName}`);
-                            imageLoadingStates.set(moduleName, 'loaded');
-                            img.classList.add('loaded');
-                            observer.unobserve(img);
-                        };
-                        
-                        img.onerror = () => {
-                            const currentAttempts = retryAttempts.get(moduleName);
-                            retryAttempts.set(moduleName, currentAttempts + 1);
-                            
-                            if (currentAttempts < MAX_RETRIES - 1) {
-                                debug(`Retry attempt ${currentAttempts + 1} for ${moduleName}`, 'warn');
-                                setTimeout(loadImage, 1000 * (currentAttempts + 1));
-                            } else {
-                                debug(`Failed to load image for: ${moduleName} after ${MAX_RETRIES} attempts`, 'error');
-                                handleImageError(img);
-                            }
-                        };
+                    img.src = img.dataset.src;
+                    debug(`Set image src to: ${img.dataset.src} for module: ${moduleName}`);
+                    
+                    img.classList.remove('lazy');
+                    observer.unobserve(img);
+                    
+                    img.onload = () => {
+                        debug(`Successfully loaded image for: ${moduleName}`);
+                        imageLoadingStates.set(moduleName, 'loaded');
+                        img.classList.add('loaded');
                     };
                     
-                    loadImage();
+                    img.onerror = () => {
+                        debug(`Failed to load image for: ${moduleName}`, 'error');
+                        handleImageError(img);
+                        imageLoadingStates.set(moduleName, 'error');
+                    };
                 }
             }
         });

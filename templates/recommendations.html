@@ -6,6 +6,16 @@
     <main class="container pt-2">
         <h1 class="recommendations-heading mb-4">Recommended Modules</h1>
 
+        <!-- Progress Bar and Counter -->
+        <div class="progress-container mb-4" style="display: none;">
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div class="progress-counter text-center mt-2">
+                Loading modules... <span class="current-progress">0</span>/<span class="total-modules">0</span>
+            </div>
+        </div>
+
         {% if recommendations.error %}
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-circle me-2"></i>
@@ -17,6 +27,9 @@
                     <div class="col-md-6 recommendation-item" data-module-index="{{ loop.index0 }}">
                         <div class="card h-100 module-card">
                             <div class="module-image-container">
+                                <div class="module-loading-spinner">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </div>
                                 {% set module_image = recommendations.images.get(module.name, '/static/images/default_module_icon.svg') %}
                                 <img data-src="{{ module_image }}" 
                                      alt="{{ module.name }} icon" 
@@ -74,126 +87,7 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Debug helper function with timestamp
-    function debug(message, type = 'info') {
-        const timestamp = new Date().toISOString();
-        const prefix = `[Module Icons ${timestamp}]:`;
-        switch(type) {
-            case 'error':
-                console.error(prefix, message);
-                break;
-            case 'warn':
-                console.warn(prefix, message);
-                break;
-            default:
-                console.debug(prefix, message);
-        }
-    }
-
-    // Enhanced error handling for images
-    function handleImageError(img) {
-        const moduleName = img.dataset.moduleName;
-        const expectedPath = img.dataset.expectedPath;
-        const currentPath = img.src;
-        
-        debug(`Image load failed for module: ${moduleName}`, 'error');
-        debug(`Expected path: ${expectedPath}`, 'error');
-        debug(`Current path: ${currentPath}`, 'error');
-        
-        if (currentPath !== '/static/images/default_module_icon.svg') {
-            debug(`Falling back to default icon for: ${moduleName}`, 'warn');
-            img.src = '/static/images/default_module_icon.svg';
-            
-            // Add visual indicator for fallback
-            const container = img.closest('.module-image-container');
-            if (container) {
-                container.classList.add('fallback-icon');
-            }
-        }
-    }
-    window.handleImageError = handleImageError;
-
-    // Lazy loading for images with enhanced error handling
-    const lazyImages = document.querySelectorAll('img.lazy');
-    const imageLoadingStates = new Map();
-    
-    const imageObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                const moduleName = img.dataset.moduleName;
-                
-                if (!imageLoadingStates.has(moduleName)) {
-                    debug(`Starting to load image for module: ${moduleName}`);
-                    imageLoadingStates.set(moduleName, 'loading');
-                    
-                    img.src = img.dataset.src;
-                    debug(`Set image src to: ${img.dataset.src} for module: ${moduleName}`);
-                    
-                    img.classList.remove('lazy');
-                    observer.unobserve(img);
-                    
-                    img.onload = () => {
-                        debug(`Successfully loaded image for: ${moduleName}`);
-                        imageLoadingStates.set(moduleName, 'loaded');
-                        img.classList.add('loaded');
-                    };
-                    
-                    img.onerror = () => {
-                        debug(`Failed to load image for: ${moduleName}`, 'error');
-                        handleImageError(img);
-                        imageLoadingStates.set(moduleName, 'error');
-                    };
-                }
-            }
-        });
-    });
-
-    lazyImages.forEach(img => {
-        debug(`Setting up lazy loading for module: ${img.dataset.moduleName}`);
-        imageObserver.observe(img);
-    });
-
-    // Progressive loading of recommendation cards
-    const recommendationItems = document.querySelectorAll('.recommendation-item');
-    const batchSize = 2;
-    let currentIndex = 0;
-
-    function showNextBatch() {
-        const end = Math.min(currentIndex + batchSize, recommendationItems.length);
-        
-        for (let i = currentIndex; i < end; i++) {
-            const item = recommendationItems[i];
-            item.style.opacity = '0';
-            item.style.display = 'block';
-            
-            // Trigger reflow
-            item.offsetHeight;
-            
-            setTimeout(() => {
-                item.style.transition = 'opacity 0.5s ease-in';
-                item.style.opacity = '1';
-                debug(`Showing recommendation ${i + 1}`);
-            }, 50 * (i - currentIndex));
-        }
-
-        currentIndex = end;
-        
-        if (currentIndex < recommendationItems.length) {
-            setTimeout(showNextBatch, 500);
-        }
-    }
-
-    // Initially hide all items
-    recommendationItems.forEach(item => {
-        item.style.display = 'none';
-    });
-
-    // Start progressive loading
-    debug('Starting progressive loading of recommendations');
-    showNextBatch();
-});
+{{ super() }}
 </script>
 {% endblock %}
 {% endblock %}

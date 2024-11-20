@@ -12,6 +12,55 @@
     min-height: 100vh;
 }
 
+/* Progress bar styles */
+.progress-container {
+    max-width: 600px;
+    margin: 0 auto 2rem;
+}
+
+.progress {
+    height: 0.5rem;
+    background-color: var(--bs-dark);
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background-color: var(--bs-primary);
+    transition: width 0.3s ease-in-out;
+}
+
+.progress-counter {
+    font-size: 0.9rem;
+    color: var(--bs-light);
+    opacity: 0.9;
+}
+
+/* Module loading spinner */
+.module-loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    color: var(--bs-primary);
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.module-loading-spinner.active {
+    opacity: 1;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
 /* Enhanced heading style */
 .recommendations-heading {
     font-size: 2.8rem;
@@ -59,13 +108,19 @@
     width: auto;
     height: auto;
     object-fit: contain;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+
+.module-image.loaded {
+    opacity: 1;
 }
 
 .module-card:hover .module-image {
     transform: scale(1.05);
 }
 
+/* Rest of the existing styles... */
 .module-title {
     color: var(--bs-primary);
     font-size: 1.5rem;
@@ -115,23 +170,9 @@
     .recommendations-heading {
         font-size: 2rem;
     }
-}
 
-/* Loading and placeholder styles */
-.module-image.lazy {
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-.module-image.loaded {
-    opacity: 1;
-}
-
-.module-image-placeholder {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(45deg, var(--bs-primary-bg-subtle), var(--bs-dark));
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    .progress-container {
+        max-width: 100%;
+        padding: 0 1rem;
+    }
 }

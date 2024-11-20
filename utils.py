@@ -24,7 +24,7 @@ import stat
 
 # Configure logging with more detailed format
 logging.basicConfig(
-    level=logging.DEBUG,  # Changed to DEBUG for more detailed logging
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(filename)s:%(lineno)d'
 )
 logger = logging.getLogger(__name__)
@@ -43,11 +43,134 @@ MODULE_VARIATIONS = {
     'employees': ['employees.png', 'employee.png', 'hr.png'],
     'timesheets': ['timesheet.png', 'timesheets.png'],
     'leaves': ['time_off.png', 'leave.png', 'leaves.png'],
-    'sales': ['sales.png', 'sale.png', 'crm.png'],
+    'sales': ['Sales.png', 'sale.png', 'crm.png'],
     'inventory': ['Inventory.png', 'stock.png', 'warehouse.png'],
-    'purchases': ['Purchase.png', 'procurement.png'],
-    'accounting': ['accounting.png', 'finance.png', 'invoicing.png']
+    'purchase': ['Purchase.png', 'procurement.png'],
+    'point_of_sale': ['pos.png', 'point_of_sale.png'],
 }
+
+def normalize_module_name(module_name: str) -> str:
+    """Normalize module name for icon matching."""
+    try:
+        logger.debug(f"Normalizing module name: {module_name}")
+        
+        if not module_name:
+            logger.warning("Empty module name provided")
+            return ""
+            
+        # Handle parentheses in module names
+        name = re.sub(r'\s*\([^)]*\)', '', module_name)
+        logger.debug(f"After removing parentheses: {name}")
+        
+        # Convert to lowercase
+        name = name.lower()
+        logger.debug(f"After lowercase conversion: {name}")
+        
+        # Remove common prefixes
+        prefixes = ['odoo_', 'module_', 'app_', 'addon_']
+        for prefix in prefixes:
+            if name.startswith(prefix):
+                name = name[len(prefix):]
+                logger.debug(f"After removing prefix {prefix}: {name}")
+        
+        # Replace special characters and normalize spaces
+        name = re.sub(r'[^a-z0-9]+', '_', name)
+        name = re.sub(r'_+', '_', name)
+        name = name.strip('_')
+        logger.debug(f"After special character handling: {name}")
+        
+        return name
+        
+    except Exception as e:
+        logger.error(f"Error normalizing module name {module_name}: {str(e)}", exc_info=True)
+        return module_name.lower()
+
+def get_local_icon_path(module_name: str) -> str:
+    """Get the local icon path for a module with enhanced matching."""
+    try:
+        # Ensure module icons are in place
+        ensure_module_icons_dir()
+        
+        # Log input module name
+        logger.info(f"Finding icon for module: {module_name}")
+        
+        # Default icon path
+        default_icon = "/static/images/default_module_icon.svg"
+        
+        # Normalize the module name for matching
+        normalized_name = normalize_module_name(module_name)
+        logger.info(f"Normalized name for matching: {normalized_name}")
+        
+        icons_dir = Path("static/module_icons")
+        if not icons_dir.exists():
+            logger.error(f"Icons directory not found: {icons_dir}")
+            return default_icon
+        
+        # Log all available icons
+        all_icons = list(icons_dir.glob('*.png'))
+        logger.info(f"Available icons ({len(all_icons)}): {[icon.name for icon in all_icons]}")
+        
+        # Try exact matches from MODULE_VARIATIONS first
+        if normalized_name in MODULE_VARIATIONS:
+            logger.info(f"Checking exact matches for {normalized_name}: {MODULE_VARIATIONS[normalized_name]}")
+            for match in MODULE_VARIATIONS[normalized_name]:
+                icon_path = icons_dir / match
+                if icon_path.exists():
+                    logger.info(f"Found exact match: {icon_path}")
+                    return f"/static/module_icons/{match}"
+        
+        # Case-insensitive search for direct matches
+        for icon_path in all_icons:
+            if normalize_module_name(icon_path.stem) == normalized_name:
+                logger.info(f"Found case-insensitive match: {icon_path}")
+                return f"/static/module_icons/{icon_path.name}"
+        
+        # Try plural/singular forms
+        singular = normalized_name.rstrip('s')
+        plural = f"{normalized_name}s"
+        
+        logger.debug(f"Trying plural/singular forms - Singular: {singular}, Plural: {plural}")
+        
+        for icon_path in all_icons:
+            icon_normalized = normalize_module_name(icon_path.stem)
+            if icon_normalized in (singular, plural):
+                logger.info(f"Found plural/singular match: {icon_path}")
+                return f"/static/module_icons/{icon_path.name}"
+        
+        # If no exact match, try partial matching with enhanced logging
+        best_match = None
+        best_score = 0.2  # Lower threshold for fuzzy matching
+        match_details = []
+        
+        for icon_path in all_icons:
+            icon_name = normalize_module_name(icon_path.stem)
+            match_score = len(set(normalized_name.split('_')) & set(icon_name.split('_'))) / \
+                         max(len(normalized_name.split('_')), len(icon_name.split('_')))
+            
+            match_details.append({
+                'icon': icon_path.name,
+                'normalized_name': icon_name,
+                'score': match_score
+            })
+            
+            if match_score > best_score:
+                best_score = match_score
+                best_match = icon_path
+                logger.debug(f"New best match: {icon_path.name} (score: {match_score})")
+        
+        # Log all attempted matches for debugging
+        logger.debug(f"Match attempts: {json.dumps(match_details, indent=2)}")
+        
+        if best_match:
+            logger.info(f"Using best match: {best_match.name} (score: {best_score})")
+            return f"/static/module_icons/{best_match.name}"
+        
+        logger.warning(f"No suitable icon found for module {module_name}, using default")
+        return default_icon
+        
+    except Exception as e:
+        logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
+        return default_icon
 
 def ensure_module_icons_dir():
     """Ensure the module_icons directory exists and contains all icons."""
@@ -123,98 +246,6 @@ def ensure_module_icons_dir():
     except Exception as e:
         logger.error(f"Error ensuring module icons directory: {str(e)}", exc_info=True)
         raise
-
-def normalize_module_name(module_name: str) -> str:
-    """Normalize module name for icon matching."""
-    # Remove common prefixes
-    name = module_name.lower()
-    prefixes = ['odoo_', 'module_', 'app_', 'addon_']
-    for prefix in prefixes:
-        if name.startswith(prefix):
-            name = name[len(prefix):]
-    
-    # Replace special characters and normalize spaces
-    name = re.sub(r'[^a-z0-9]+', '_', name.lower())
-    name = re.sub(r'_+', '_', name)
-    name = name.strip('_')
-    
-    logger.debug(f"Normalized module name: {module_name} -> {name}")
-    return name
-
-def get_local_icon_path(module_name: str) -> str:
-    """Get the local icon path for a module with enhanced matching."""
-    try:
-        # Ensure module icons are in place
-        ensure_module_icons_dir()
-        
-        # Log input module name
-        logger.info(f"Finding icon for module: {module_name}")
-        
-        # Default icon path
-        default_icon = "/static/images/default_module_icon.svg"
-        
-        # Normalize the module name for matching
-        normalized_name = normalize_module_name(module_name)
-        logger.info(f"Normalized name for matching: {normalized_name}")
-        
-        icons_dir = Path("static/module_icons")
-        if not icons_dir.exists():
-            logger.error(f"Icons directory not found: {icons_dir}")
-            return default_icon
-        
-        # Log all available icons
-        all_icons = list(icons_dir.glob('*.png'))
-        logger.info(f"Available icons ({len(all_icons)}): {[icon.name for icon in all_icons]}")
-        
-        # Try exact matches from MODULE_VARIATIONS first
-        if normalized_name in MODULE_VARIATIONS:
-            logger.info(f"Checking exact matches for {normalized_name}: {MODULE_VARIATIONS[normalized_name]}")
-            for match in MODULE_VARIATIONS[normalized_name]:
-                icon_path = icons_dir / match
-                if icon_path.exists():
-                    logger.info(f"Found exact match: {icon_path}")
-                    return f"/static/module_icons/{match}"
-        
-        # Case-insensitive search for direct matches
-        for icon_path in all_icons:
-            if normalize_module_name(icon_path.stem) == normalized_name:
-                logger.info(f"Found case-insensitive match: {icon_path}")
-                return f"/static/module_icons/{icon_path.name}"
-        
-        # If no exact match, try partial matching
-        best_match = None
-        best_score = 0.2  # Lower threshold as requested
-        match_details = []
-        
-        for icon_path in all_icons:
-            icon_name = normalize_module_name(icon_path.stem)
-            match_score = len(set(normalized_name.split('_')) & set(icon_name.split('_'))) / \
-                         max(len(normalized_name.split('_')), len(icon_name.split('_')))
-            
-            match_details.append({
-                'icon': icon_path.name,
-                'normalized_name': icon_name,
-                'score': match_score
-            })
-            
-            if match_score > best_score:
-                best_score = match_score
-                best_match = icon_path
-                logger.debug(f"New best match: {icon_path.name} (score: {match_score})")
-        
-        # Log all attempted matches for debugging
-        logger.debug(f"Match attempts: {json.dumps(match_details, indent=2)}")
-        
-        if best_match:
-            logger.info(f"Using best match: {best_match.name} (score: {best_score})")
-            return f"/static/module_icons/{best_match.name}"
-        
-        logger.warning(f"No suitable icon found for module {module_name}, using default")
-        return default_icon
-        
-    except Exception as e:
-        logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
-        return default_icon
 
 # Updated system prompt as per requirements
 SYSTEM_PROMPT = """Assist me in creating a system that accurately recommends Odoo apps based solely on user input and predefined requirements. Use the provided dataset of official Odoo modules and their descriptions to generate responses. Avoid suggesting unrelated or random Odoo modules that are not part of the dataset. Ensure that each recommendation is relevant to the user's input and linked to its correct functionality and description."""

@@ -24,6 +24,7 @@
                                      loading="lazy"
                                      src="/static/images/placeholder.svg"
                                      data-module-name="{{ module.name }}"
+                                     data-expected-path="{{ module_image }}"
                                      onerror="handleImageError(this);">
                             </div>
                             <div class="card-body">
@@ -74,22 +75,46 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Debug helper
-    function debug(message) {
-        console.debug(`[Module Icons]: ${message}`);
+    // Debug helper function with timestamp
+    function debug(message, type = 'info') {
+        const timestamp = new Date().toISOString();
+        const prefix = `[Module Icons ${timestamp}]:`;
+        switch(type) {
+            case 'error':
+                console.error(prefix, message);
+                break;
+            case 'warn':
+                console.warn(prefix, message);
+                break;
+            default:
+                console.debug(prefix, message);
+        }
     }
 
     // Enhanced error handling for images
     function handleImageError(img) {
-        debug(`Image load failed for module: ${img.dataset.moduleName}`);
-        if (img.src !== '/static/images/default_module_icon.svg') {
-            debug(`Falling back to default icon for: ${img.dataset.moduleName}`);
+        const moduleName = img.dataset.moduleName;
+        const expectedPath = img.dataset.expectedPath;
+        const currentPath = img.src;
+        
+        debug(`Image load failed for module: ${moduleName}`, 'error');
+        debug(`Expected path: ${expectedPath}`, 'error');
+        debug(`Current path: ${currentPath}`, 'error');
+        
+        if (currentPath !== '/static/images/default_module_icon.svg') {
+            debug(`Falling back to default icon for: ${moduleName}`, 'warn');
             img.src = '/static/images/default_module_icon.svg';
+            
+            // Add visual indicator for fallback
+            const container = img.closest('.module-image-container');
+            if (container) {
+                container.classList.add('fallback-icon');
+            }
         }
     }
     window.handleImageError = handleImageError;
 
-    // Lazy loading for images with error handling
+    // Lazy loading for images with enhanced error handling
     const lazyImages = document.querySelectorAll('img.lazy');
     const imageLoadingStates = new Map();
     
@@ -100,10 +125,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const moduleName = img.dataset.moduleName;
                 
                 if (!imageLoadingStates.has(moduleName)) {
-                    debug(`Loading image for module: ${moduleName}`);
+                    debug(`Starting to load image for module: ${moduleName}`);
                     imageLoadingStates.set(moduleName, 'loading');
                     
                     img.src = img.dataset.src;
+                    debug(`Set image src to: ${img.dataset.src} for module: ${moduleName}`);
+                    
                     img.classList.remove('lazy');
                     observer.unobserve(img);
                     
@@ -114,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                     
                     img.onerror = () => {
-                        debug(`Failed to load image for: ${moduleName}`);
+                        debug(`Failed to load image for: ${moduleName}`, 'error');
                         handleImageError(img);
                         imageLoadingStates.set(moduleName, 'error');
                     };
@@ -124,6 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     lazyImages.forEach(img => {
+        debug(`Setting up lazy loading for module: ${img.dataset.moduleName}`);
         imageObserver.observe(img);
     });
 

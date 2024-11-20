@@ -2,12 +2,6 @@
 
 {% block content %}
 <div class="min-h-screen bg-gradient">
-    <!-- Preload hints for module icons -->
-    {% for module in recommendations.modules %}
-        {% set module_image = recommendations.images.get(module.name, '/static/images/default_module_icon.svg') %}
-        <link rel="preload" href="{{ module_image }}" as="image">
-    {% endfor %}
-    
     <!-- Main Content -->
     <main class="container pt-2">
         <h1 class="recommendations-heading mb-4">Recommended Modules</h1>
@@ -22,13 +16,12 @@
                 {% for module in recommendations.modules %}
                     <div class="col-md-6 recommendation-item" data-module-index="{{ loop.index0 }}">
                         <div class="card h-100 module-card">
-                            <div class="module-image-container" data-loading="true">
+                            <div class="module-image-container">
                                 {% set module_image = recommendations.images.get(module.name, '/static/images/default_module_icon.svg') %}
                                 <img data-src="{{ module_image }}" 
                                      alt="{{ module.name }} icon" 
                                      class="module-image lazy"
-                                     fetchpriority="{% if loop.index0 < 2 %}high{% else %}low{% endif %}"
-                                     loading="{% if loop.index0 < 2 %}eager{% else %}lazy{% endif %}"
+                                     loading="lazy"
                                      src="/static/images/placeholder.svg"
                                      data-module-name="{{ module.name }}"
                                      data-expected-path="{{ module_image }}"
@@ -98,22 +91,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Preload high priority images
-    function preloadHighPriorityImages() {
-        const highPriorityImages = document.querySelectorAll('img[fetchpriority="high"]');
-        highPriorityImages.forEach(img => {
-            const imageUrl = img.dataset.src;
-            if (imageUrl) {
-                const preloadLink = document.createElement('link');
-                preloadLink.rel = 'preload';
-                preloadLink.as = 'image';
-                preloadLink.href = imageUrl;
-                document.head.appendChild(preloadLink);
-                debug(`Preloading high priority image: ${imageUrl}`);
-            }
-        });
-    }
-
     // Enhanced error handling for images
     function handleImageError(img) {
         const moduleName = img.dataset.moduleName;
@@ -137,74 +114,45 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     window.handleImageError = handleImageError;
 
-    // Optimized lazy loading with priority handling
-    const imageLoadQueue = new Map();
-    const concurrentLoads = 2;
-    let activeLoads = 0;
-
-    function processNextImage() {
-        if (activeLoads >= concurrentLoads || imageLoadQueue.size === 0) return;
-
-        const [nextKey, img] = imageLoadQueue.entries().next().value;
-        if (!img) return;
-
-        imageLoadQueue.delete(nextKey);
-        activeLoads++;
-
-        const moduleName = img.dataset.moduleName;
-        debug(`Loading image for module: ${moduleName}`);
-
-        img.src = img.dataset.src;
-        img.classList.remove('lazy');
-
-        img.onload = () => {
-            debug(`Successfully loaded image for: ${moduleName}`);
-            img.classList.add('loaded');
-            activeLoads--;
-            processNextImage();
-        };
-
-        img.onerror = () => {
-            debug(`Failed to load image for: ${moduleName}`, 'error');
-            handleImageError(img);
-            activeLoads--;
-            processNextImage();
-        };
-    }
-
-    // Initialize image loading
+    // Lazy loading for images with enhanced error handling
     const lazyImages = document.querySelectorAll('img.lazy');
-    lazyImages.forEach((img, index) => {
-        const moduleName = img.dataset.moduleName;
-        imageLoadQueue.set(moduleName, img);
-    });
-
-    // Start loading high priority images immediately
-    preloadHighPriorityImages();
-
-    // Set up intersection observer for lazy loading
+    const imageLoadingStates = new Map();
+    
     const imageObserver = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const img = entry.target;
                 const moduleName = img.dataset.moduleName;
                 
-                if (imageLoadQueue.has(moduleName)) {
-                    processNextImage();
+                if (!imageLoadingStates.has(moduleName)) {
+                    debug(`Starting to load image for module: ${moduleName}`);
+                    imageLoadingStates.set(moduleName, 'loading');
+                    
+                    img.src = img.dataset.src;
+                    debug(`Set image src to: ${img.dataset.src} for module: ${moduleName}`);
+                    
+                    img.classList.remove('lazy');
+                    observer.unobserve(img);
+                    
+                    img.onload = () => {
+                        debug(`Successfully loaded image for: ${moduleName}`);
+                        imageLoadingStates.set(moduleName, 'loaded');
+                        img.classList.add('loaded');
+                    };
+                    
+                    img.onerror = () => {
+                        debug(`Failed to load image for: ${moduleName}`, 'error');
+                        handleImageError(img);
+                        imageLoadingStates.set(moduleName, 'error');
+                    };
                 }
-                
-                observer.unobserve(img);
             }
         });
     });
 
-    // Observe all lazy images
     lazyImages.forEach(img => {
-        if (img.getAttribute('fetchpriority') === 'low') {
-            imageObserver.observe(img);
-        } else {
-            processNextImage();
-        }
+        debug(`Setting up lazy loading for module: ${img.dataset.moduleName}`);
+        imageObserver.observe(img);
     });
 
     // Progressive loading of recommendation cards

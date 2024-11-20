@@ -275,6 +275,12 @@ def get_local_icon_path(module_name: str) -> str:
         # Ensure module icons are in place
         ensure_module_icons_dir()
         
+        # Check cache first
+        cached_path = icon_cache_manager.get_icon(module_name)
+        if cached_path:
+            logger.info(f"Using cached icon path for {module_name}: {cached_path}")
+            return cached_path
+        
         # Log input module name
         logger.info(f"Finding icon for module: {module_name}")
         
@@ -292,6 +298,7 @@ def get_local_icon_path(module_name: str) -> str:
         icons_dir = Path("static/module_icons")
         if not icons_dir.exists():
             logger.error(f"Icons directory not found: {icons_dir}")
+            icon_cache_manager.set_icon(module_name, default_icon)
             return default_icon
         
         # Log all available icons
@@ -304,14 +311,18 @@ def get_local_icon_path(module_name: str) -> str:
             for match in MODULE_VARIATIONS[normalized_name]:
                 icon_path = icons_dir / match
                 if icon_path.exists():
+                    result = f"/static/module_icons/{match}"
+                    icon_cache_manager.set_icon(module_name, result)
                     logger.info(f"Found exact match: {icon_path}")
-                    return f"/static/module_icons/{match}"
+                    return result
         
         # Case-insensitive search for direct matches
         for icon_path in all_icons:
             if normalize_module_name(icon_path.stem) == normalized_name:
+                result = f"/static/module_icons/{icon_path.name}"
+                icon_cache_manager.set_icon(module_name, result)
                 logger.info(f"Found case-insensitive match: {icon_path}")
-                return f"/static/module_icons/{icon_path.name}"
+                return result
         
         # Try plural/singular forms
         singular = normalized_name.rstrip('s')
@@ -322,10 +333,14 @@ def get_local_icon_path(module_name: str) -> str:
         for icon_path in all_icons:
             icon_normalized = normalize_module_name(icon_path.stem)
             if icon_normalized in (singular, plural):
+                result = f"/static/module_icons/{icon_path.name}"
+                icon_cache_manager.set_icon(module_name, result)
                 logger.info(f"Found plural/singular match: {icon_path}")
-                return f"/static/module_icons/{icon_path.name}"
+                return result
         
+        # If no match found, use default icon
         logger.warning(f"No suitable icon found for module {module_name}, using default")
+        icon_cache_manager.set_icon(module_name, default_icon)
         return default_icon
         
     except Exception as e:

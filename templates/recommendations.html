@@ -19,11 +19,12 @@
                             <div class="module-image-container">
                                 {% set module_image = recommendations.images.get(module.name, '/static/images/default_module_icon.svg') %}
                                 <img data-src="{{ module_image }}" 
-                                     alt="{{ module.name }}" 
+                                     alt="{{ module.name }} icon" 
                                      class="module-image lazy"
                                      loading="lazy"
                                      src="/static/images/placeholder.svg"
-                                     onerror="this.onerror=null; this.src='/static/images/default_module_icon.svg';">
+                                     data-module-name="{{ module.name }}"
+                                     onerror="handleImageError(this);">
                             </div>
                             <div class="card-body">
                                 <h3 class="module-title">{{ module.name }}</h3>
@@ -70,78 +71,59 @@
     </main>
 </div>
 
-<style>
-/* Updated styles as per requirements */
-.module-image-container {
-    height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bs-dark);
-    padding: 1rem;
-    overflow: hidden;
-}
-
-.module-image {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    transition: transform 0.3s ease;
-}
-
-.module-card:hover .module-image {
-    transform: scale(1.05);
-}
-
-.recommendation-item {
-    opacity: 0;
-    transition: opacity 0.5s ease-in;
-}
-
-.module-image.lazy {
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-.module-image.loaded {
-    opacity: 1;
-}
-
-.module-title {
-    color: var(--bs-primary);
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-}
-
-.module-description {
-    color: var(--bs-light);
-    font-size: 1rem;
-    line-height: 1.6;
-}
-</style>
-
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Debug helper
+    function debug(message) {
+        console.debug(`[Module Icons]: ${message}`);
+    }
+
+    // Enhanced error handling for images
+    function handleImageError(img) {
+        debug(`Image load failed for module: ${img.dataset.moduleName}`);
+        if (img.src !== '/static/images/default_module_icon.svg') {
+            debug(`Falling back to default icon for: ${img.dataset.moduleName}`);
+            img.src = '/static/images/default_module_icon.svg';
+        }
+    }
+    window.handleImageError = handleImageError;
+
     // Lazy loading for images with error handling
     const lazyImages = document.querySelectorAll('img.lazy');
+    const imageLoadingStates = new Map();
     
     const imageObserver = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const img = entry.target;
-                img.src = img.dataset.src;
-                img.classList.remove('lazy');
-                observer.unobserve(img);
+                const moduleName = img.dataset.moduleName;
+                
+                if (!imageLoadingStates.has(moduleName)) {
+                    debug(`Loading image for module: ${moduleName}`);
+                    imageLoadingStates.set(moduleName, 'loading');
+                    
+                    img.src = img.dataset.src;
+                    img.classList.remove('lazy');
+                    observer.unobserve(img);
+                    
+                    img.onload = () => {
+                        debug(`Successfully loaded image for: ${moduleName}`);
+                        imageLoadingStates.set(moduleName, 'loaded');
+                        img.classList.add('loaded');
+                    };
+                    
+                    img.onerror = () => {
+                        debug(`Failed to load image for: ${moduleName}`);
+                        handleImageError(img);
+                        imageLoadingStates.set(moduleName, 'error');
+                    };
+                }
             }
         });
     });
 
     lazyImages.forEach(img => {
-        img.addEventListener('error', function() {
-            this.src = '/static/images/default_module_icon.svg';
-            this.classList.add('error');
-        });
         imageObserver.observe(img);
     });
 
@@ -154,11 +136,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const end = Math.min(currentIndex + batchSize, recommendationItems.length);
         
         for (let i = currentIndex; i < end; i++) {
-            recommendationItems[i].style.opacity = '0';
-            recommendationItems[i].style.display = 'block';
+            const item = recommendationItems[i];
+            item.style.opacity = '0';
+            item.style.display = 'block';
+            
+            // Trigger reflow
+            item.offsetHeight;
+            
             setTimeout(() => {
-                recommendationItems[i].style.transition = 'opacity 0.5s ease-in';
-                recommendationItems[i].style.opacity = '1';
+                item.style.transition = 'opacity 0.5s ease-in';
+                item.style.opacity = '1';
+                debug(`Showing recommendation ${i + 1}`);
             }, 50 * (i - currentIndex));
         }
 
@@ -175,6 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Start progressive loading
+    debug('Starting progressive loading of recommendations');
     showNextBatch();
 });
 </script>

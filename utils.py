@@ -24,7 +24,7 @@ import stat
 
 # Configure logging with more detailed format
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed to DEBUG for more detailed logging
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(filename)s:%(lineno)d'
 )
 logger = logging.getLogger(__name__)
@@ -37,30 +37,16 @@ if not OPENAI_API_KEY:
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Updated system prompt as per requirements
-SYSTEM_PROMPT = """Assist me in creating a system that accurately recommends Odoo apps based solely on user input and predefined requirements. Use the provided dataset of official Odoo modules and their descriptions to generate responses. Avoid suggesting unrelated or random Odoo modules that are not part of the dataset. Ensure that each recommendation is relevant to the user's input and linked to its correct functionality and description."""
-
-# Image queue with improved error handling and synchronization
-image_queue = queue.Queue()
-queue_lock = RLock()  # Using RLock for recursive locking capability
-processed_items_lock = RLock()
-queue_active = True
-queue_event = Event()
-
-# Shared state for processed items with thread-safe access
-processed_items = set()
-MAX_RETRIES = 3
-
-# Common module name variations
+# Common module name variations with exact matches
 MODULE_VARIATIONS = {
-    'leaves': ['leave', 'time_off', 'holidays'],
-    'timesheets': ['timesheet', 'time_tracking', 'time_management'],
-    'employees': ['employee', 'hr', 'human_resources'],
-    'projects': ['project', 'tasks', 'task_management'],
-    'sales': ['sale', 'selling', 'crm'],
-    'inventory': ['stock', 'warehouse', 'inventories'],
-    'purchases': ['purchase', 'procurement', 'buying'],
-    'accounting': ['account', 'finance', 'invoicing']
+    'project': ['project.png'],
+    'employees': ['employees.png', 'employee.png', 'hr.png'],
+    'timesheets': ['timesheet.png', 'timesheets.png'],
+    'leaves': ['time_off.png', 'leave.png', 'leaves.png'],
+    'sales': ['sales.png', 'sale.png', 'crm.png'],
+    'inventory': ['Inventory.png', 'stock.png', 'warehouse.png'],
+    'purchases': ['Purchase.png', 'procurement.png'],
+    'accounting': ['accounting.png', 'finance.png', 'invoicing.png']
 }
 
 def ensure_module_icons_dir():
@@ -83,9 +69,11 @@ def ensure_module_icons_dir():
             logger.error(f"Source directory not found: {source_dir}")
             return
             
-        # Log available icons in source directory
+        # Log available icons in source directory with normalized names
         source_icons = list(source_dir.glob('*.png'))
-        logger.debug(f"Available icons in source directory: {[icon.name for icon in source_icons]}")
+        logger.info(f"Source icons found: {len(source_icons)}")
+        for icon in source_icons:
+            logger.debug(f"Source icon: {icon.name} -> normalized: {normalize_module_name(icon.stem)}")
         
         # Track file operations
         copied_files = 0
@@ -125,65 +113,16 @@ def ensure_module_icons_dir():
                 except Exception as e:
                     logger.error(f"Retry failed for {source_file.name}: {str(e)}")
         
-        # Log final icon inventory
+        # Verify final icon inventory
         final_icons = list(target_dir.glob('*.png'))
         logger.info(f"Final icon inventory: {len(final_icons)} files")
-        logger.debug(f"Available icons after copy: {[icon.name for icon in final_icons]}")
+        for icon in final_icons:
+            logger.debug(f"Available icon: {icon.name} -> normalized: {normalize_module_name(icon.stem)}")
         logger.info(f"Icon copy summary - Copied: {copied_files}, Skipped: {skipped_files}, Failed: {failed_files}")
         
     except Exception as e:
         logger.error(f"Error ensuring module icons directory: {str(e)}", exc_info=True)
         raise
-
-def get_name_variations(module_name: str) -> List[str]:
-    """Get all possible variations of a module name."""
-    normalized = module_name.lower()
-    variations = {normalized}
-    
-    # Add common variations
-    if normalized in MODULE_VARIATIONS:
-        variations.update(MODULE_VARIATIONS[normalized])
-    
-    # Handle plural/singular forms
-    if normalized.endswith('s'):
-        variations.add(normalized[:-1])  # Remove 's'
-    else:
-        variations.add(f"{normalized}s")  # Add 's'
-    
-    # Handle common suffixes
-    suffixes = ['_management', '_module', '_app', '_system']
-    for suffix in suffixes:
-        if normalized.endswith(suffix):
-            variations.add(normalized[:-len(suffix)])
-        else:
-            variations.add(f"{normalized}{suffix}")
-    
-    logger.debug(f"Generated variations for {module_name}: {variations}")
-    return list(variations)
-
-def get_match_score(name1: str, name2: str) -> float:
-    """Calculate match score between two module names."""
-    name1_parts = set(name1.lower().split('_'))
-    name2_parts = set(name2.lower().split('_'))
-    
-    # Remove common words that don't add meaning
-    common_words = {'module', 'app', 'system', 'management'}
-    name1_parts = {part for part in name1_parts if part not in common_words}
-    name2_parts = {part for part in name2_parts if part not in common_words}
-    
-    common_parts = name1_parts.intersection(name2_parts)
-    
-    if not name1_parts or not name2_parts:
-        return 0
-    
-    # Calculate weighted Jaccard similarity
-    similarity = len(common_parts) / max(len(name1_parts), len(name2_parts))
-    
-    # Boost score if one name contains the other
-    if name1.lower() in name2.lower() or name2.lower() in name1.lower():
-        similarity += 0.3
-    
-    return min(similarity, 1.0)
 
 def normalize_module_name(module_name: str) -> str:
     """Normalize module name for icon matching."""
@@ -227,58 +166,46 @@ def get_local_icon_path(module_name: str) -> str:
         all_icons = list(icons_dir.glob('*.png'))
         logger.info(f"Available icons ({len(all_icons)}): {[icon.name for icon in all_icons]}")
         
-        # Direct matches based on module type
-        exact_matches = {
-            'employees': ['employees.png', 'employee.png', 'hr.png'],
-            'timesheets': ['timesheet.png', 'timesheets.png', 'time_tracking.png'],
-            'leaves': ['leave.png', 'leaves.png', 'time_off.png']
-        }
-        
-        # Try exact matches first
-        if normalized_name in exact_matches:
-            logger.info(f"Checking exact matches for {normalized_name}: {exact_matches[normalized_name]}")
-            for match in exact_matches[normalized_name]:
+        # Try exact matches from MODULE_VARIATIONS first
+        if normalized_name in MODULE_VARIATIONS:
+            logger.info(f"Checking exact matches for {normalized_name}: {MODULE_VARIATIONS[normalized_name]}")
+            for match in MODULE_VARIATIONS[normalized_name]:
                 icon_path = icons_dir / match
                 if icon_path.exists():
                     logger.info(f"Found exact match: {icon_path}")
                     return f"/static/module_icons/{match}"
         
-        # Get all possible name variations
-        name_variations = get_name_variations(normalized_name)
-        logger.info(f"Trying variations: {name_variations}")
+        # Case-insensitive search for direct matches
+        for icon_path in all_icons:
+            if normalize_module_name(icon_path.stem) == normalized_name:
+                logger.info(f"Found case-insensitive match: {icon_path}")
+                return f"/static/module_icons/{icon_path.name}"
         
+        # If no exact match, try partial matching
         best_match = None
-        best_score = 0
+        best_score = 0.2  # Lower threshold as requested
         match_details = []
         
         for icon_path in all_icons:
             icon_name = normalize_module_name(icon_path.stem)
-            logger.debug(f"Checking icon: {icon_path.name} (normalized: {icon_name})")
+            match_score = len(set(normalized_name.split('_')) & set(icon_name.split('_'))) / \
+                         max(len(normalized_name.split('_')), len(icon_name.split('_')))
             
-            # Try exact matches first
-            if icon_name in name_variations:
-                logger.info(f"Found exact variation match: {icon_path}")
-                return f"/static/module_icons/{icon_path.name}"
+            match_details.append({
+                'icon': icon_path.name,
+                'normalized_name': icon_name,
+                'score': match_score
+            })
             
-            # Calculate match score for each variation
-            for variation in name_variations:
-                match_score = get_match_score(variation, icon_name)
-                match_details.append({
-                    'icon': icon_path.name,
-                    'variation': variation,
-                    'score': match_score
-                })
-                
-                if match_score > best_score:
-                    best_score = match_score
-                    best_match = icon_path
-                    logger.debug(f"New best match: {icon_path.name} (score: {match_score})")
+            if match_score > best_score:
+                best_score = match_score
+                best_match = icon_path
+                logger.debug(f"New best match: {icon_path.name} (score: {match_score})")
         
         # Log all attempted matches for debugging
         logger.debug(f"Match attempts: {json.dumps(match_details, indent=2)}")
         
-        # Lower threshold to 0.2 for more permissive matching
-        if best_match and best_score >= 0.2:
+        if best_match:
             logger.info(f"Using best match: {best_match.name} (score: {best_score})")
             return f"/static/module_icons/{best_match.name}"
         
@@ -288,6 +215,20 @@ def get_local_icon_path(module_name: str) -> str:
     except Exception as e:
         logger.error(f"Error finding local icon for {module_name}: {str(e)}", exc_info=True)
         return default_icon
+
+# Updated system prompt as per requirements
+SYSTEM_PROMPT = """Assist me in creating a system that accurately recommends Odoo apps based solely on user input and predefined requirements. Use the provided dataset of official Odoo modules and their descriptions to generate responses. Avoid suggesting unrelated or random Odoo modules that are not part of the dataset. Ensure that each recommendation is relevant to the user's input and linked to its correct functionality and description."""
+
+# Image queue with improved error handling and synchronization
+image_queue = queue.Queue()
+queue_lock = RLock()  # Using RLock for recursive locking capability
+processed_items_lock = RLock()
+queue_active = True
+queue_event = Event()
+
+# Shared state for processed items with thread-safe access
+processed_items = set()
+MAX_RETRIES = 3
 
 def process_image_queue():
     """Background thread for processing image queue with improved error handling and retry mechanism."""

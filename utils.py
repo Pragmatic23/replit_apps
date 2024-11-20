@@ -123,8 +123,8 @@ icon_cache_manager = IconCache()
 
 # Common module name variations with exact matches
 MODULE_VARIATIONS = {
+    'inventory': ['inventory.png', 'Inventory.png', 'stock.png', 'warehouse.png'],
     'sales': ['sales.png', 'Sales.png', 'sale.png', 'crm.png'],
-    'inventory': ['Inventory.png', 'stock.png', 'warehouse.png'],
     'purchase': ['Purchase.png', 'procurement.png'],
     'point_of_sale': ['pos.png', 'point_of_sale.png'],
     'project': ['project.png'],
